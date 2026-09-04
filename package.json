@@ -6,7 +6,7 @@
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
     ".": {
-      "react-native-flash-reels-source": "./src/index.tsx",
+      "react-native-flash-reels-source": "./src/index.ts",
       "types": "./lib/typescript/src/index.d.ts",
       "default": "./lib/module/index.js"
     },
@@ -33,26 +33,43 @@
   ],
   "scripts": {
     "example": "yarn workspace react-native-flash-reels-example",
-    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
+    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib coverage",
     "prepare": "bob build",
     "typecheck": "tsc",
-    "lint": "eslint \"**/*.{js,ts,tsx}\""
+    "typecheck:tests": "tsc -p tsconfig.test.json --noEmit",
+    "lint": "eslint \"**/*.{js,ts,tsx,mjs,cjs}\"",
+    "lint:fix": "eslint \"**/*.{js,ts,tsx,mjs,cjs}\" --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "validate": "yarn typecheck && yarn typecheck:tests && yarn lint && yarn format:check && yarn test",
+    "docs": "yarn --cwd website",
+    "docs:start": "yarn --cwd website start",
+    "docs:build": "yarn --cwd website build",
+    "docs:deploy": "yarn --cwd website deploy"
   },
   "keywords": [
     "react-native",
+    "reels",
+    "video",
+    "flashlist",
+    "tiktok",
+    "short-video",
     "ios",
     "android"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dgehl/react-native-flash-reels.git"
+    "url": "git+https://github.com/thedev204/react-native-flash-reels.git"
   },
-  "author": "dgehl <dgehl@users.noreply.github.com> (https://github.com/dgehl)",
+  "author": "thedev204 <thedev204@users.noreply.github.com> (https://github.com/thedev204)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/dgehl/react-native-flash-reels/issues"
+    "url": "https://github.com/thedev204/react-native-flash-reels/issues"
   },
-  "homepage": "https://github.com/dgehl/react-native-flash-reels#readme",
+  "homepage": "https://thedev204.github.io/react-native-flash-reels/",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
@@ -62,22 +79,55 @@
     "@eslint/js": "^10.0.1",
     "@react-native/babel-preset": "0.85.0",
     "@react-native/eslint-config": "0.85.0",
+    "@react-native/jest-preset": "0.85.0",
+    "@shopify/flash-list": "^2.0.0",
+    "@testing-library/react-native": "^13.2.0",
+    "@types/jest": "^29.5.14",
     "@types/react": "^19.2.0",
     "del-cli": "^7.0.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-ft-flow": "^3.0.11",
     "eslint-plugin-prettier": "^5.5.6",
+    "jest": "^29.7.0",
+    "lefthook": "^1.11.13",
     "prettier": "^3.8.3",
     "react": "19.2.3",
     "react-native": "0.85.0",
     "react-native-builder-bob": "^0.41.0",
+    "react-native-gesture-handler": "^2.28.0",
+    "react-native-reanimated": "^4.6.0",
+    "react-native-video": "^6.16.0",
+    "react-native-worklets": "^0.12.1",
+    "react-test-renderer": "19.2.3",
     "turbo": "^2.9.16",
     "typescript": "^6.0.3"
   },
   "peerDependencies": {
+    "@shopify/flash-list": ">=2.0.0",
     "react": "*",
-    "react-native": "*"
+    "react-native": "*",
+    "react-native-gesture-handler": ">=2.0.0",
+    "react-native-reanimated": ">=4.0.0",
+    "react-native-video": ">=6.0.0",
+    "react-native-worklets": ">=0.12.0"
+  },
+  "peerDependenciesMeta": {
+    "@shopify/flash-list": {
+      "optional": false
+    },
+    "react-native-gesture-handler": {
+      "optional": false
+    },
+    "react-native-reanimated": {
+      "optional": false
+    },
+    "react-native-video": {
+      "optional": false
+    },
+    "react-native-worklets": {
+      "optional": false
+    }
   },
   "workspaces": [
     "example"
@@ -101,18 +151,13 @@
       ]
     ]
   },
-  "prettier": {
-    "quoteProps": "consistent",
-    "singleQuote": true,
-    "tabWidth": 2,
-    "trailingComma": "es5",
-    "useTabs": false
-  },
   "create-react-native-library": {
     "type": "library",
     "languages": "js",
     "tools": [
-      "eslint"
+      "eslint",
+      "jest",
+      "lefthook"
     ],
     "version": "0.63.0"
   }

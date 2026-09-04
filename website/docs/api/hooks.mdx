@@ -1,0 +1,20 @@
+---
+title: Hooks
+---
+
+# Hooks
+
+## `useFlashReels()`
+
+Available inside `renderOverlay` and its descendants. Throws if used outside a `FlashReels` tree.
+
+```ts
+const { activeIndex, isMuted, toggleMute, setMuted } = useFlashReels();
+```
+
+| Field         | Type                       | Description                  |
+| ------------- | -------------------------- | ---------------------------- |
+| `activeIndex` | `number`                   | Currently visible reel index |
+| `isMuted`     | `boolean`                  | Global mute state            |
+| `toggleMute`  | `() => void`               | Flip mute                    |
+| `setMuted`    | `(muted: boolean) => void` | Set mute explicitly          |

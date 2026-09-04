@@ -1,0 +1,134 @@
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 4.5rem 0 3.5rem;
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 15% 20%,
+      rgba(229, 57, 53, 0.22),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 90% 80%,
+      rgba(229, 57, 53, 0.12),
+      transparent 50%
+    ),
+    #050505;
+  color: #f5f5f5;
+}
+
+.heroGlow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 70%, rgba(5, 5, 5, 0.85));
+}
+
+.heroInner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 3rem;
+  align-items: center;
+}
+
+.heroCopy {
+  text-align: left;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  color: #ff8a80;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.subtitle {
+  margin: 1rem 0 0;
+  max-width: 34rem;
+  color: #c4c4c4;
+  font-size: 1.15rem;
+  line-height: 1.55;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.primaryCta {
+  background: #e53935;
+  border-color: #e53935;
+  color: #fff;
+}
+
+.primaryCta:hover {
+  background: #c62828;
+  border-color: #c62828;
+  color: #fff;
+}
+
+.secondaryCta {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #f5f5f5;
+}
+
+.secondaryCta:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+}
+
+.demoRow {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.demoPhone {
+  width: min(220px, 42vw);
+  height: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  background: #111;
+}
+
+@media screen and (max-width: 996px) {
+  .hero {
+    padding: 3rem 0 2.5rem;
+  }
+
+  .heroInner {
+    grid-template-columns: 1fr;
+    gap: 2.25rem;
+    text-align: center;
+  }
+
+  .heroCopy {
+    text-align: center;
+  }
+
+  .subtitle {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .buttons {
+    justify-content: center;
+  }
+}

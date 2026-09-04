@@ -1,0 +1,48 @@
+---
+sidebar_position: 1
+slug: /intro
+title: Introduction
+---
+
+import DemoStrip from '@site/src/components/DemoStrip';
+
+# Introduction
+
+**react-native-flash-reels** is a high-performance vertical video feed for React Native. It is built on **FlashList v2** and the **New Architecture**.
+
+<DemoStrip />
+
+## Features
+
+- Snap-scrolling full-screen reels
+- Auto play/pause from viewability, plus single-tap pause/play
+- Double-tap to like with heart animation
+- Global mute (controlled or uncontrolled)
+- Optional Instagram-style bottom progress bar
+- Optional pagination (`onEndReached`) and pull-to-refresh
+- Optional buffering loader
+- Custom overlay and video engine via render props
+- Preload window to cap concurrent video decoders
+
+## What stays in your app
+
+Comments UI and overlay layout are product decisions. The library owns feed mechanics and exposes a `renderOverlay` slot — no opinionated captions, avatars, or comment sheets ship in the core package.
+
+## Requirements
+
+| Package                        | Version   |
+| :----------------------------- | :-------- |
+| `@shopify/flash-list`          | >= 2.0.0  |
+| `react-native-video`           | >= 6.0.0  |
+| `react-native-reanimated`      | >= 4.0.0  |
+| `react-native-worklets`        | >= 0.12.0 |
+| `react-native-gesture-handler` | >= 2.0.0  |
+
+Requires the React Native New Architecture.
+
+## Next steps
+
+- [Installation](./installation)
+- [Usage](./usage)
+- [Props API](./api/props)
+- [Performance](./performance)

@@ -1,20 +1,20 @@
-import { Text, View, StyleSheet } from 'react-native';
-import { multiply } from 'react-native-flash-reels';
-
-const result = multiply(3, 7);
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ReelsScreen } from './screens/ReelsScreen';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Result: {result}</Text>
-    </View>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={styles.root}>
+        <ReelsScreen />
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

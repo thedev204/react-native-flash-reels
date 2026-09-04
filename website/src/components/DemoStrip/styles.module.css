@@ -1,0 +1,16 @@
+.strip {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 1.5rem 0 2rem;
+}
+
+.phone {
+  width: min(220px, 42vw);
+  height: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(127, 127, 127, 0.25);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  background: #111;
+}

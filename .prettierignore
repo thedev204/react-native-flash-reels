@@ -1,0 +1,23 @@
+# dependencies
+node_modules
+.yarn
+
+# builds
+lib
+coverage
+.turbo
+example/android
+example/ios
+example/vendor
+website/build
+website/.docusaurus
+website/node_modules
+website/yarn.lock
+
+# locks / generated
+yarn.lock
+*.lock
+
+# misc
+*.log
+.DS_Store

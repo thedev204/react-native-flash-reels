@@ -1,0 +1,16 @@
+---
+sidebar_position: 6
+title: Example app
+---
+
+# Example app
+
+The repo ships a vanilla React Native example that wires `FlashReels` to mock clips (with `duration` for the progress bar), a custom overlay, controlled mute, pagination/refresh, buffering UI, and a comments bottom sheet (`@gorhom/bottom-sheet`). The comments UI lives **only** in the example — not in the library.
+
+```bash
+yarn
+yarn example start
+yarn example android   # or: yarn example ios
+```
+
+Use the example as a copy-paste starting point for overlay layout, mute handling, and progress-bar data (`duration` on each reel). See [Progress bar](./usage#progress-bar) for why duration matters.

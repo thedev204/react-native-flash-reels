@@ -1,0 +1,25 @@
+---
+sidebar_position: 5
+title: Performance
+---
+
+# Performance
+
+## Preload window
+
+Only `activeIndex ± preloadWindowSize` items mount a real video source. Everything else shows the poster (or a blank fallback).
+
+This is the main lever for **Android decoder limits** — keep `preloadWindowSize` small (default `1`) unless you have a strong reason to raise it.
+
+```tsx
+<FlashReels data={data} preloadWindowSize={1} />
+```
+
+## Memoization
+
+- `ReelItem` is memoized internally.
+- Keep `renderOverlay`, `onLike`, and similar callbacks stable with `useCallback` when possible so recycled cells do not re-render unnecessarily.
+
+## `removeClippedSubviews`
+
+Left **off** by default. It has caused video-surface quirks on some Android versions. Treat it as an opt-in experiment if you need it in your own fork or wrapper.

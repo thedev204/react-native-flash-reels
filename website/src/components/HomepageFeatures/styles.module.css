@@ -1,0 +1,73 @@
+.features {
+  display: flex;
+  align-items: stretch;
+  padding: 3.5rem 0 4rem;
+  width: 100%;
+  background: var(--ifm-background-color);
+}
+
+.card {
+  height: 100%;
+  padding: 1.5rem 1.25rem;
+  border: 1px solid rgba(127, 127, 127, 0.18);
+  border-radius: 14px;
+  background: rgba(127, 127, 127, 0.04);
+}
+
+.icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.85rem;
+  border-radius: 10px;
+  background: rgba(229, 57, 53, 0.12);
+  position: relative;
+}
+
+.icon span {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  background: #e53935;
+}
+
+.bolt span {
+  clip-path: polygon(55% 0, 20% 55%, 45% 55%, 40% 100%, 80% 40%, 55% 40%);
+}
+
+.layers span {
+  width: 1.05rem;
+  height: 0.7rem;
+  background: transparent;
+  border: 2px solid #e53935;
+  border-radius: 2px;
+  box-shadow:
+    3px -3px 0 -1px #050505,
+    3px -3px 0 0 #e53935;
+}
+
+.gauge span {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid #e53935;
+  border-top-color: transparent;
+  transform: rotate(-30deg);
+}
+
+.cardTitle {
+  margin-bottom: 0.5rem;
+  font-size: 1.15rem;
+}
+
+.cardBody {
+  margin: 0;
+  color: var(--ifm-color-content-secondary);
+  line-height: 1.55;
+}
+
+.cardBody code {
+  font-size: 0.9em;
+}

@@ -1,0 +1,57 @@
+---
+sidebar_position: 2
+title: Installation
+---
+
+# Installation
+
+```bash
+npm install react-native-flash-reels @shopify/flash-list react-native-video react-native-reanimated react-native-worklets react-native-gesture-handler
+```
+
+Or with Yarn:
+
+```bash
+yarn add react-native-flash-reels @shopify/flash-list react-native-video react-native-reanimated react-native-worklets react-native-gesture-handler
+```
+
+## Peer dependencies
+
+| Package                        | Notes                                       |
+| ------------------------------ | ------------------------------------------- |
+| `@shopify/flash-list`          | v2+ (New Architecture)                      |
+| `react-native-video`           | Default player; swappable via `renderVideo` |
+| `react-native-reanimated`      | Like animation (v4+, New Architecture)      |
+| `react-native-worklets`        | Required by Reanimated 4                    |
+| `react-native-gesture-handler` | Single vs double tap                        |
+
+## Babel
+
+Add the Worklets plugin **last** in your Babel config:
+
+```js title="babel.config.js"
+module.exports = {
+  presets: ['module:@react-native/babel-preset'],
+  plugins: ['react-native-worklets/plugin'],
+};
+```
+
+## Gesture handler
+
+Import gesture-handler at your app entry, and wrap the tree (or reels screen) in `GestureHandlerRootView`:
+
+```js title="index.js"
+import 'react-native-gesture-handler';
+```
+
+```tsx
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+export default function App() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* ... */}
+    </GestureHandlerRootView>
+  );
+}
+```

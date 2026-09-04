@@ -1,0 +1,154 @@
+---
+sidebar_position: 3
+title: Usage
+---
+
+# Usage
+
+```tsx
+import {
+  FlashReels,
+  useFlashReels,
+  MuteButton,
+} from 'react-native-flash-reels';
+import type { ReelData } from 'react-native-flash-reels';
+import { Text } from 'react-native';
+
+type Reel = ReelData & { username: string; caption: string };
+
+const data: Reel[] = [
+  {
+    id: '1',
+    videoUri: 'https://example.com/one.mp4',
+    posterUri: 'https://example.com/one.jpg',
+    duration: 12.5,
+    username: 'maya',
+    caption: 'Golden hour',
+  },
+];
+
+function Overlay({ item }: { item: Reel }) {
+  const { isMuted } = useFlashReels();
+  return (
+    <>
+      <MuteButton />
+      <Text>@{item.username}</Text>
+      <Text>{item.caption}</Text>
+      <Text>{isMuted ? 'Muted' : 'Sound on'}</Text>
+    </>
+  );
+}
+
+export function ReelsScreen() {
+  return (
+    <FlashReels
+      data={data}
+      defaultMuted
+      onLike={(item) => console.log('liked', item.id)}
+      renderOverlay={(item) => <Overlay item={item} />}
+    />
+  );
+}
+```
+
+## Progress bar
+
+Enable an Instagram-style bottom progress track on the **built-in** player:
+
+```tsx
+<FlashReels data={data} showProgressBar />
+```
+
+Optional track styling via `progressBarStyle`. Ignored when `renderVideo` is set.
+
+### Always pass `duration` on each reel
+
+The bar is `currentTime / duration`. Playback can start **before** the native player knows the clip length (especially large remote MP4s where metadata loads late). Until duration is known, the fill stays at `0` — then jumps once metadata arrives.
+
+**Pass `duration` (seconds) on every `ReelData` item** so the bar tracks from the first frame:
+
+```tsx
+const data: ReelData[] = [
+  {
+    id: '1',
+    videoUri: 'https://cdn.example.com/reel-1.mp4',
+    duration: 12.5, // seconds — from your API / upload pipeline
+  },
+];
+
+<FlashReels data={data} showProgressBar />;
+```
+
+| Situation              | What you see                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `duration` set on data | Bar moves immediately with playback                                                                                                   |
+| `duration` omitted     | Bar waits for `onLoad` / seekable range — often fine on small/local files, **3–5s+ delay** (or a sudden jump) on heavy remote 4K MP4s |
+
+**Where to get duration:** your backend at upload/transcode time, CDN/media API, or `ffprobe` in a pipeline. Do not rely on the client discovering it from the file alone if you care about swipe-in UX.
+
+Native metadata can still refine the value after `onLoad`; data `duration` is what makes the first seconds reliable.
+
+## Pagination and pull-to-refresh
+
+Parent owns the data. Wire FlashList-style callbacks when you need infinite scroll or refresh:
+
+```tsx
+<FlashReels
+  data={page}
+  onEndReached={loadMore}
+  onEndReachedThreshold={0.5}
+  refreshing={refreshing}
+  onRefresh={reload}
+/>
+```
+
+`onRefresh` enables bounce/overscroll so the gesture works; without it, overscroll stays locked for snap paging.
+
+## Buffering loader
+
+Show a spinner while the active reel buffers (built-in player only):
+
+```tsx
+<FlashReels data={data} showBufferingLoader />
+```
+
+Or supply your own UI — providing `renderBufferingLoader` alone is enough:
+
+```tsx
+<FlashReels data={data} renderBufferingLoader={() => <MySpinner />} />
+```
+
+## Imperative ref
+
+```tsx
+import { useRef } from 'react';
+import { FlashReels } from 'react-native-flash-reels';
+import type { FlashReelsRef } from 'react-native-flash-reels';
+
+const ref = useRef<FlashReelsRef>(null);
+
+ref.current?.scrollToIndex(3);
+ref.current?.pause();
+ref.current?.play();
+```
+
+## Custom video engine
+
+Pass `renderVideo` when you want something other than `react-native-video`:
+
+```tsx
+<FlashReels
+  data={data}
+  renderVideo={(item, { isActive, muted }) => (
+    <MyPlayer uri={item.videoUri} playing={isActive} muted={muted} />
+  )}
+/>
+```
+
+## Controlled mute
+
+```tsx
+const [muted, setMuted] = useState(true);
+
+<FlashReels data={data} muted={muted} onMuteChange={setMuted} />;
+```

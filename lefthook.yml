@@ -1,0 +1,25 @@
+# Enforce formatting / lint / tests before commit.
+pre-commit:
+  parallel: true
+  commands:
+    prettier:
+      glob: '*.{js,jsx,ts,tsx,mjs,cjs,json,md,yml,yaml}'
+      run: yarn prettier --check {staged_files}
+    eslint:
+      glob: '*.{js,jsx,ts,tsx,mjs,cjs}'
+      run: yarn eslint {staged_files}
+    typecheck:
+      glob: '*.{ts,tsx}'
+      run: yarn typecheck
+    test:
+      glob: '*.{ts,tsx}'
+      run: yarn test --bail --findRelatedTests {staged_files}
+
+pre-push:
+  commands:
+    test:
+      run: yarn test --coverage=false
+    lint:
+      run: yarn lint
+    typecheck:
+      run: yarn typecheck

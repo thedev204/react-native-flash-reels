@@ -1,0 +1,40 @@
+---
+title: Types
+---
+
+# Types
+
+```ts
+interface ReelData {
+  id: string;
+  videoUri: string;
+  posterUri?: string;
+  /**
+   * Clip length in seconds. Strongly recommended with `showProgressBar` —
+   * without it the bar waits for native metadata and can lag on large remote files.
+   */
+  duration?: number;
+}
+
+interface OverlayMeta {
+  index: number;
+  isActive: boolean;
+}
+
+interface VideoMeta {
+  isActive: boolean;
+  muted: boolean;
+}
+
+interface FlashReelsRef {
+  scrollToIndex: (index: number) => void;
+  play: () => void;
+  pause: () => void;
+}
+```
+
+Extend `ReelData` with your own fields and pass a typed `data` / `renderOverlay`:
+
+```ts
+type Reel = ReelData & { username: string; caption: string };
+```
