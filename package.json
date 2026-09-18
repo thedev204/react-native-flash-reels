@@ -1,6 +1,6 @@
 {
   "name": "react-native-flash-reels",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Lightweight, customizable vertical video feed for React Native built on FlashList v2",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",

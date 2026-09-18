@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -30,7 +31,9 @@ import {
   type FlashReelsContextValue,
 } from '../context/FlashReelsContext';
 import type { FlashReelsProps, FlashReelsRef, ReelData } from '../types';
+import { runFeedPrefetch, type ScrollDirection } from '../utils/prefetch';
 import { isWithinPreloadWindow } from '../utils/preloadWindow';
+import { resolveBufferConfig } from '../utils/resolveBufferConfig';
 import { ReelItem } from './ReelItem';
 
 const VIEWABILITY_CONFIG = {
@@ -56,6 +59,14 @@ function FlashReelsInner<T extends ReelData>(
     renderVideo,
     likeIcon,
     preloadWindowSize = 1,
+    prefetchEnabled = false,
+    prefetchWindowSize = 2,
+    prefetchStrategy = 'directional',
+    showPosterUntilReady = false,
+    posterBlurRadius = 0,
+    initialQuality = 'auto',
+    resolveVideoUri,
+    videoCacheEnabled = false,
     bufferConfig,
     showProgressBar = false,
     progressBarStyle,
@@ -79,10 +90,16 @@ function FlashReelsInner<T extends ReelData>(
   const [activeIndex, setActiveIndex] = useState(0);
   const [uncontrolledMuted, setUncontrolledMuted] = useState(defaultMuted);
   const [isPausedGlobally, setIsPausedGlobally] = useState(false);
+  const scrollDirectionRef = useRef<ScrollDirection>(1);
 
   const isControlled = mutedProp !== undefined;
   const isMuted = isControlled ? mutedProp : uncontrolledMuted;
   const refreshEnabled = onRefresh != null;
+
+  const effectiveBufferConfig = useMemo(
+    () => resolveBufferConfig(bufferConfig, videoCacheEnabled),
+    [bufferConfig, videoCacheEnabled]
+  );
 
   const setMuted = useCallback(
     (next: boolean) => {
@@ -128,12 +145,40 @@ function FlashReelsInner<T extends ReelData>(
         if (prev === nextIndex) {
           return prev;
         }
+        if (nextIndex > prev) {
+          scrollDirectionRef.current = 1;
+        } else if (nextIndex < prev) {
+          scrollDirectionRef.current = -1;
+        }
         onIndexChange?.(nextIndex);
         return nextIndex;
       });
     },
     [onIndexChange]
   );
+
+  useEffect(() => {
+    if (!prefetchEnabled) {
+      return;
+    }
+    runFeedPrefetch({
+      data,
+      activeIndex,
+      windowSize: prefetchWindowSize,
+      strategy: prefetchStrategy,
+      direction: scrollDirectionRef.current,
+      initialQuality,
+      resolveVideoUri,
+    });
+  }, [
+    prefetchEnabled,
+    data,
+    activeIndex,
+    prefetchWindowSize,
+    prefetchStrategy,
+    initialQuality,
+    resolveVideoUri,
+  ]);
 
   const contextValue = useMemo<FlashReelsContextValue>(
     () => ({
@@ -181,11 +226,15 @@ function FlashReelsInner<T extends ReelData>(
         isMuted={isMuted}
         isPausedGlobally={isPausedGlobally}
         likeIcon={likeIcon}
-        bufferConfig={bufferConfig}
+        bufferConfig={effectiveBufferConfig}
         showProgressBar={showProgressBar}
         progressBarStyle={progressBarStyle}
         showBufferingLoader={showBufferingLoader}
         renderBufferingLoader={renderBufferingLoader}
+        showPosterUntilReady={showPosterUntilReady}
+        posterBlurRadius={posterBlurRadius}
+        initialQuality={initialQuality}
+        resolveVideoUri={resolveVideoUri}
         videoStyle={videoStyle}
         renderOverlay={renderOverlay}
         renderVideo={renderVideo}
@@ -201,11 +250,15 @@ function FlashReelsInner<T extends ReelData>(
       isMuted,
       isPausedGlobally,
       likeIcon,
-      bufferConfig,
+      effectiveBufferConfig,
       showProgressBar,
       progressBarStyle,
       showBufferingLoader,
       renderBufferingLoader,
+      showPosterUntilReady,
+      posterBlurRadius,
+      initialQuality,
+      resolveVideoUri,
       videoStyle,
       renderOverlay,
       renderVideo,
@@ -252,7 +305,9 @@ function FlashReelsInner<T extends ReelData>(
           viewabilityConfig={VIEWABILITY_CONFIG}
           extraData={extraData}
           drawDistance={listHeight * (preloadWindowSize + 1)}
-          removeClippedSubviews={Platform.OS === 'android'}
+          // FlashList v2 recycles via absolute positioning; native
+          // removeClippedSubviews detaches Android video surfaces → black frames.
+          removeClippedSubviews={false}
         />
       </View>
     </FlashReelsContext.Provider>

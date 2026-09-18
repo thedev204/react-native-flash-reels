@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -24,11 +25,13 @@ import Video, {
 } from 'react-native-video';
 import { useDoubleTap } from '../hooks/useDoubleTap';
 import type {
+  InitialQuality,
   OverlayMeta,
   ReelData,
   VideoBufferConfig,
   VideoMeta,
 } from '../types';
+import { resolveVideoUri as resolveItemVideoUri } from '../utils/resolveVideoUri';
 import { BufferingLoader } from './BufferingLoader';
 import { LikeHeart } from './LikeHeart';
 import { PauseIndicator } from './PauseIndicator';
@@ -66,6 +69,10 @@ export interface ReelItemProps<T extends ReelData = ReelData> {
   progressBarStyle?: StyleProp<ViewStyle>;
   showBufferingLoader?: boolean;
   renderBufferingLoader?: () => ReactNode;
+  showPosterUntilReady?: boolean;
+  posterBlurRadius?: number;
+  initialQuality?: InitialQuality;
+  resolveVideoUri?: (item: T) => string;
   videoStyle?: StyleProp<ViewStyle>;
   renderOverlay?: (item: T, meta: OverlayMeta) => ReactNode;
   renderVideo?: (item: T, meta: VideoMeta) => ReactNode;
@@ -95,6 +102,10 @@ function ReelItemInner<T extends ReelData>({
   progressBarStyle,
   showBufferingLoader = false,
   renderBufferingLoader,
+  showPosterUntilReady = false,
+  posterBlurRadius = 0,
+  initialQuality = 'auto',
+  resolveVideoUri: customResolveVideoUri,
   videoStyle,
   renderOverlay,
   renderVideo,
@@ -105,6 +116,7 @@ function ReelItemInner<T extends ReelData>({
   // scrolling to a reel always starts playback fresh.
   const [pausedOverride, setPausedOverride] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const [hearts, setHearts] = useState<HeartBurst[]>([]);
   const progress = useSharedValue(0);
   const durationRef = useRef(0);
@@ -113,8 +125,14 @@ function ReelItemInner<T extends ReelData>({
 
   const bufferingEnabled =
     !renderVideo && (showBufferingLoader || renderBufferingLoader != null);
+  const posterUntilReady = !renderVideo && showPosterUntilReady;
 
   isActiveRef.current = isActive;
+
+  const playbackUri = useMemo(
+    () => resolveItemVideoUri(item, initialQuality, customResolveVideoUri),
+    [item, initialQuality, customResolveVideoUri]
+  );
 
   // Seed from ReelData.duration when present so the bar can move before native
   // metadata arrives. Player onLoad may refine the value later.
@@ -130,7 +148,19 @@ function ReelItemInner<T extends ReelData>({
     setPausedOverride((prev) => (prev ? false : prev));
   }, [isActive]);
 
-  // Clear stale buffering flags when the item leaves the active/load window.
+  // Clear stale buffering / ready flags when the item leaves the load window
+  // or the source changes.
+  useEffect(() => {
+    if (!shouldLoad) {
+      setIsBuffering((prev) => (prev ? false : prev));
+      setIsVideoReady((prev) => (prev ? false : prev));
+    }
+  }, [shouldLoad]);
+
+  useEffect(() => {
+    setIsVideoReady(false);
+  }, [playbackUri, item.id]);
+
   useEffect(() => {
     if (!isActive || !shouldLoad) {
       setIsBuffering((prev) => (prev ? false : prev));
@@ -234,8 +264,17 @@ function ReelItemInner<T extends ReelData>({
       rememberDuration(data.duration, 'load');
       setProgressRatio(data.currentTime, durationRef.current);
       syncProgressFromPlayer();
+      // Fallback when onReadyForDisplay is flaky (common on Android).
+      if (posterUntilReady) {
+        setIsVideoReady(true);
+      }
     },
-    [rememberDuration, setProgressRatio, syncProgressFromPlayer]
+    [
+      rememberDuration,
+      setProgressRatio,
+      syncProgressFromPlayer,
+      posterUntilReady,
+    ]
   );
 
   const handleProgress = useCallback(
@@ -249,6 +288,18 @@ function ReelItemInner<T extends ReelData>({
   const handleBuffer = useCallback((data: { isBuffering: boolean }) => {
     setIsBuffering(data.isBuffering);
   }, []);
+
+  const handleReadyForDisplay = useCallback(() => {
+    setIsVideoReady(true);
+  }, []);
+
+  const handleVideoError = useCallback(() => {
+    // Unblock poster overlay / spinner if the native player fails.
+    setIsBuffering(false);
+    if (posterUntilReady) {
+      setIsVideoReady(true);
+    }
+  }, [posterUntilReady]);
 
   const handleSingleTap = useCallback(() => {
     if (!isActive) {
@@ -296,61 +347,108 @@ function ReelItemInner<T extends ReelData>({
   const videoMeta: VideoMeta = { isActive, muted: effectiveMuted };
 
   const mediaStyle = [styles.media, videoStyle] as StyleProp<ImageStyle>;
+  const blurRadius =
+    posterBlurRadius > 0 && (!shouldLoad || (posterUntilReady && !isVideoReady))
+      ? posterBlurRadius
+      : 0;
+
+  const posterNode = item.posterUri ? (
+    <Image
+      source={{ uri: item.posterUri }}
+      style={mediaStyle}
+      resizeMode="cover"
+      blurRadius={blurRadius > 0 ? blurRadius : undefined}
+    />
+  ) : (
+    <View style={[styles.media, styles.posterFallback, videoStyle]} />
+  );
 
   let videoNode: ReactNode;
   if (!shouldLoad) {
-    videoNode = item.posterUri ? (
-      <Image
-        source={{ uri: item.posterUri }}
-        style={mediaStyle}
-        resizeMode="cover"
-      />
-    ) : (
-      <View style={[styles.media, styles.posterFallback, videoStyle]} />
-    );
+    videoNode = posterNode;
   } else if (renderVideo) {
     videoNode = renderVideo(item, videoMeta);
   } else {
-    const source: ReactVideoProps['source'] = { uri: item.videoUri };
+    const source: ReactVideoProps['source'] = { uri: playbackUri };
     // Keep onLoad/onProgress attached while preloading so duration is known
     // before the reel becomes active — avoids a blank bar on first swipe-in.
-    const progressProps = showProgressBar
-      ? {
-          onLoad: handleLoad,
-          onProgress: handleProgress,
-          progressUpdateInterval: PROGRESS_POLL_MS,
-        }
-      : undefined;
+    // Also attach onLoad for poster-until-ready so we can clear the overlay if
+    // onReadyForDisplay never fires.
+    const progressProps =
+      showProgressBar || posterUntilReady
+        ? {
+            onLoad: handleLoad,
+            ...(showProgressBar
+              ? {
+                  onProgress: handleProgress,
+                  progressUpdateInterval: PROGRESS_POLL_MS,
+                }
+              : undefined),
+          }
+        : undefined;
+
+    // Only cover the player when a real poster exists. Without posterUri the
+    // fallback is a dark view that permanently hides video if ready never fires.
+    const showPosterOverlay =
+      posterUntilReady && !isVideoReady && item.posterUri != null;
+
     videoNode = (
-      <Video
-        ref={showProgressBar ? videoRef : undefined}
-        source={source}
-        style={mediaStyle}
-        resizeMode="cover"
-        repeat={loop}
-        paused={paused}
-        muted={effectiveMuted}
-        // Explicit — some platforms flash native chrome on cold mount if omitted.
-        controls={false}
-        poster={item.posterUri}
-        posterResizeMode="cover"
-        playInBackground={false}
-        playWhenInactive={false}
-        ignoreSilentSwitch="ignore"
-        {...progressProps}
-        {...(bufferingEnabled ? { onBuffer: handleBuffer } : undefined)}
-        {...(bufferConfig
-          ? {
-              bufferConfig: {
-                minBufferMs: bufferConfig.minBufferMs ?? 2500,
-                maxBufferMs: bufferConfig.maxBufferMs ?? 5000,
-                bufferForPlaybackMs: bufferConfig.minBufferMs ?? 2500,
-                bufferForPlaybackAfterRebufferMs:
-                  bufferConfig.bufferForPlaybackAfterRebufferMs ?? 5000,
-              },
-            }
-          : undefined)}
-      />
+      <>
+        <Video
+          ref={showProgressBar ? videoRef : undefined}
+          source={source}
+          style={mediaStyle}
+          resizeMode="cover"
+          repeat={loop}
+          paused={paused}
+          muted={effectiveMuted}
+          // Explicit — some platforms flash native chrome on cold mount if omitted.
+          controls={false}
+          poster={posterUntilReady ? undefined : item.posterUri}
+          posterResizeMode="cover"
+          playInBackground={false}
+          playWhenInactive={false}
+          ignoreSilentSwitch="ignore"
+          hideShutterView
+          shutterColor="transparent"
+          onReadyForDisplay={
+            posterUntilReady ? handleReadyForDisplay : undefined
+          }
+          onError={handleVideoError}
+          {...progressProps}
+          {...(bufferingEnabled ? { onBuffer: handleBuffer } : undefined)}
+          {...(bufferConfig
+            ? {
+                bufferConfig: {
+                  minBufferMs: bufferConfig.minBufferMs ?? 2500,
+                  maxBufferMs: bufferConfig.maxBufferMs ?? 5000,
+                  bufferForPlaybackMs: bufferConfig.minBufferMs ?? 2500,
+                  bufferForPlaybackAfterRebufferMs:
+                    bufferConfig.bufferForPlaybackAfterRebufferMs ?? 5000,
+                  ...(bufferConfig.preferredPeakBitRate != null
+                    ? {
+                        preferredPeakBitRate: bufferConfig.preferredPeakBitRate,
+                      }
+                    : undefined),
+                  ...(bufferConfig.preferredMaximumResolution != null
+                    ? {
+                        preferredMaximumResolution:
+                          bufferConfig.preferredMaximumResolution,
+                      }
+                    : undefined),
+                  ...(bufferConfig.cacheSizeMB != null
+                    ? { cacheSizeMB: bufferConfig.cacheSizeMB }
+                    : undefined),
+                },
+              }
+            : undefined)}
+        />
+        {showPosterOverlay ? (
+          <View pointerEvents="none" style={styles.posterOverlay}>
+            {posterNode}
+          </View>
+        ) : null}
+      </>
     );
   }
 
@@ -371,8 +469,14 @@ function ReelItemInner<T extends ReelData>({
 
   return (
     <View style={[styles.container, { height }]}>
+      {/* Keep Video outside GestureDetector — wrapping the surface in RNGH
+          commonly yields a permanent black frame on Android. */}
+      <View style={styles.media} pointerEvents="none">
+        {videoNode}
+      </View>
+
       <GestureDetector gesture={gesture}>
-        <View style={styles.media}>{videoNode}</View>
+        <View style={styles.gestureLayer} />
       </GestureDetector>
 
       {bufferingNode}
@@ -416,6 +520,14 @@ const styles = StyleSheet.create({
   },
   media: {
     ...StyleSheet.absoluteFill,
+  },
+  gestureLayer: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 2,
+  },
+  posterOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 1,
   },
   bufferingSlot: {
     ...StyleSheet.absoluteFill,

@@ -105,4 +105,65 @@ describe('FlashReels', () => {
     expect(onEndReached).not.toHaveBeenCalled();
     expect(onRefresh).not.toHaveBeenCalled();
   });
+
+  it('mounts with opt-in prefetch and poster-until-ready without changing defaults', () => {
+    const prefetchSpy = jest
+      .spyOn(require('react-native').Image, 'prefetch')
+      .mockResolvedValue(true);
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      arrayBuffer: async () => new ArrayBuffer(0),
+    } as Response);
+
+    render(
+      <FlashReels
+        data={data}
+        prefetchEnabled
+        prefetchWindowSize={2}
+        showPosterUntilReady
+        posterBlurRadius={12}
+        renderOverlay={(item) => <Text>{item.id}</Text>}
+      />
+    );
+
+    expect(screen.getByText('1')).toBeTruthy();
+    expect(screen.getAllByTestId('mock-video').length).toBeGreaterThan(0);
+
+    prefetchSpy.mockRestore();
+    fetchSpy.mockRestore();
+  });
+
+  it('passes default cacheSizeMB when videoCacheEnabled is true', () => {
+    render(<FlashReels data={data} videoCacheEnabled />);
+
+    const video = screen.getAllByTestId('mock-video')[0];
+    expect(video).toBeTruthy();
+    expect(video!.props.bufferConfig?.cacheSizeMB).toBe(100);
+  });
+
+  it('lets explicit bufferConfig.cacheSizeMB override the default', () => {
+    render(
+      <FlashReels
+        data={data}
+        videoCacheEnabled
+        bufferConfig={{ cacheSizeMB: 50 }}
+      />
+    );
+
+    const video = screen.getAllByTestId('mock-video')[0];
+    expect(video).toBeTruthy();
+    expect(video!.props.bufferConfig?.cacheSizeMB).toBe(50);
+  });
+
+  it('ignores videoCacheEnabled when renderVideo is provided', () => {
+    render(
+      <FlashReels
+        data={data}
+        videoCacheEnabled
+        renderVideo={() => <Text testID="custom-player">custom</Text>}
+      />
+    );
+
+    expect(screen.getAllByTestId('custom-player').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('mock-video')).toBeNull();
+  });
 });

@@ -31,12 +31,12 @@ const FeatureList: FeatureItem[] = [
     ),
   },
   {
-    title: 'Decoder-aware performance',
+    title: 'Prefetch & cache',
     mark: 'gauge',
     description: (
       <>
-        A preload window caps concurrent video sources — critical on Android
-        where hardware decoders are scarce.
+        Opt-in HTTP/poster prefetch, poster-first loading, and RN Video disk
+        cache — without raising the decoder window on Android.
       </>
     ),
   },

@@ -29,6 +29,7 @@
 
 <p align="center">
   High-performance vertical video feed for React Native, built on FlashList v2.
+  Optional prefetch, poster-first, quality ladders, and RN Video disk cache for Instagram-like swipe UX.
 </p>
 
 <p align="center">
@@ -47,6 +48,18 @@
 </p>
 
 ---
+
+## Features
+
+- FlashList v2 snap paging (New Architecture)
+- Auto play/pause from viewability + single-tap pause
+- Double-tap like, mute controls, optional progress bar
+- **Opt-in HTTP/poster prefetch** with directional warm-up
+- **Opt-in poster / blur-first** until the first frame
+- **Opt-in RN Video disk cache** (`videoCacheEnabled`)
+- Optional progressive quality ladder / HLS-ready ABR docs
+- Custom overlay and video engine via render props
+- Decoder preload window to cap concurrent players
 
 ## Requirements
 
@@ -70,7 +83,7 @@ npm install react-native-flash-reels @shopify/flash-list react-native-video reac
 yarn add react-native-flash-reels @shopify/flash-list react-native-video react-native-reanimated react-native-worklets react-native-gesture-handler
 ```
 
-See the [installation guide](https://thedev204.github.io/react-native-flash-reels/docs/installation) for Babel / gesture-handler setup.
+See the [installation guide](https://thedev204.github.io/react-native-flash-reels/docs/installation) for Babel / gesture-handler setup (and the optional iOS video-cache Podfile flag).
 
 ## Quick Start
 
@@ -113,12 +126,32 @@ export function ReelsScreen() {
       data={data}
       defaultMuted
       showProgressBar
+      prefetchEnabled
+      prefetchWindowSize={2}
+      showPosterUntilReady
+      videoCacheEnabled
       onLike={(item) => console.log('liked', item.id)}
       renderOverlay={(item) => <Overlay item={item} />}
     />
   );
 }
 ```
+
+## Prefetch & performance (opt-in)
+
+All of these default **off** so existing apps stay unchanged:
+
+| Prop                                             | What it does                                                             |
+| ------------------------------------------------ | ------------------------------------------------------------------------ |
+| `preloadWindowSize`                              | How many neighbors mount a real `Video` decoder (default `1`)            |
+| `prefetchEnabled`                                | Warms posters + a tiny HTTP `Range` of upcoming URIs (no extra decoders) |
+| `prefetchWindowSize` / `prefetchStrategy`        | How far / how to bias prefetch (`directional` or `symmetric`)            |
+| `showPosterUntilReady` / `posterBlurRadius`      | Keep `posterUri` visible until the first frame                           |
+| `videoCacheEnabled` / `bufferConfig.cacheSizeMB` | RN Video disk cache (Android runtime; iOS needs Podfile flag)            |
+
+Pass `posterUri` when using `showPosterUntilReady`. Rank feeds on your backend and optionally set `prefetchPriority` on items.
+
+Full guide: **[Performance](https://thedev204.github.io/react-native-flash-reels/docs/performance)**.
 
 ## Documentation
 
@@ -133,7 +166,7 @@ Full API reference, guides, and examples are available on the **[official docume
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md) for release history.
+See [CHANGELOG.md](./CHANGELOG.md) for release history (`0.3.0`).
 
 ## Contributing
 

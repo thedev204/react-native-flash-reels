@@ -5,6 +5,17 @@ title: Types
 # Types
 
 ```ts
+interface ReelQuality {
+  uri: string;
+  bandwidth?: number;
+  width?: number;
+  height?: number;
+  label?: string;
+}
+
+type PrefetchStrategy = 'symmetric' | 'directional';
+type InitialQuality = 'auto' | 'low' | 'high';
+
 interface ReelData {
   id: string;
   videoUri: string;
@@ -14,6 +25,10 @@ interface ReelData {
    * without it the bar waits for native metadata and can lag on large remote files.
    */
   duration?: number;
+  /** Progressive quality ladder when not using HLS/DASH on videoUri. */
+  qualities?: ReelQuality[];
+  /** Higher = prefetch earlier when prefetchEnabled. */
+  prefetchPriority?: number;
 }
 
 interface OverlayMeta {
@@ -25,6 +40,19 @@ interface VideoMeta {
   isActive: boolean;
   muted: boolean;
 }
+
+interface VideoBufferConfig {
+  minBufferMs?: number;
+  maxBufferMs?: number;
+  bufferForPlaybackAfterRebufferMs?: number;
+  /** Android disk cache size in MB; iOS needs Podfile flag. */
+  cacheSizeMB?: number;
+  preferredPeakBitRate?: number;
+  preferredMaximumResolution?: { width: number; height: number };
+}
+
+/** Default when videoCacheEnabled is true and cacheSizeMB is unset. */
+declare const DEFAULT_VIDEO_CACHE_SIZE_MB: 100;
 
 interface FlashReelsRef {
   scrollToIndex: (index: number) => void;

@@ -1,6 +1,20 @@
 import type { ReactElement, ReactNode, Ref } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
+/** Progressive MP4 (or similar) ladder rung when not using HLS/DASH ABR. */
+export interface ReelQuality {
+  uri: string;
+  /** Approximate bitrate in bits per second — used for low/high/auto picks. */
+  bandwidth?: number;
+  width?: number;
+  height?: number;
+  label?: string;
+}
+
+export type PrefetchStrategy = 'symmetric' | 'directional';
+
+export type InitialQuality = 'auto' | 'low' | 'high';
+
 export interface ReelData {
   id: string;
   videoUri: string;
@@ -11,6 +25,16 @@ export interface ReelData {
    * stay at 0 for several seconds on large / slow-to-probe remote files.
    */
   duration?: number;
+  /**
+   * Optional progressive quality ladder. Ignored when `resolveVideoUri` is set.
+   * Prefer a single HLS/DASH `videoUri` for true adaptive bitrate.
+   */
+  qualities?: ReelQuality[];
+  /**
+   * Higher values are warmed earlier when `prefetchEnabled` is on.
+   * Use with a ranked feed from your backend.
+   */
+  prefetchPriority?: number;
 }
 
 export interface OverlayMeta {
@@ -30,7 +54,26 @@ export interface VideoBufferConfig {
   maxBufferMs?: number;
   /** Buffer to keep after playback position, in milliseconds. */
   bufferForPlaybackAfterRebufferMs?: number;
+  /**
+   * Android disk cache size in MB (react-native-video SimpleCache).
+   * `0` disables. When set, the first value wins for the app process.
+   * iOS also needs `$RNVideoUseVideoCaching=true` in the app Podfile.
+   */
+  cacheSizeMB?: number;
+  /**
+   * iOS / HLS hint — preferred peak bitrate in bits per second.
+   * Passed through to react-native-video when supported.
+   */
+  preferredPeakBitRate?: number;
+  /**
+   * iOS / HLS hint — preferred maximum resolution.
+   * Passed through to react-native-video when supported.
+   */
+  preferredMaximumResolution?: { width: number; height: number };
 }
+
+/** Default Android disk cache size when `videoCacheEnabled` is true. */
+export const DEFAULT_VIDEO_CACHE_SIZE_MB = 100;
 
 export interface FlashReelsProps<T extends ReelData = ReelData> {
   data: T[];
@@ -65,6 +108,52 @@ export interface FlashReelsProps<T extends ReelData = ReelData> {
    * Caps concurrent decoders — especially important on Android. Default 1.
    */
   preloadWindowSize?: number;
+
+  /**
+   * Warm posters and a tiny HTTP Range of upcoming video URIs without mounting
+   * extra decoders. Independent of `preloadWindowSize`. Defaults to false.
+   */
+  prefetchEnabled?: boolean;
+  /**
+   * How many items to warm beyond the active index when prefetch is on.
+   * Defaults to 2.
+   */
+  prefetchWindowSize?: number;
+  /**
+   * Prefetch index layout. `directional` biases ahead of scroll; `symmetric`
+   * mirrors `±window`. Defaults to `directional`.
+   */
+  prefetchStrategy?: PrefetchStrategy;
+
+  /**
+   * Keep a poster (optionally blurred) under the built-in player until the
+   * first frame. Ignored when `renderVideo` is provided. Defaults to false.
+   */
+  showPosterUntilReady?: boolean;
+  /**
+   * Blur radius for the poster while waiting / outside the decoder window.
+   * Defaults to 0.
+   */
+  posterBlurRadius?: number;
+
+  /**
+   * When `qualities` is set, which rung to play first. `auto` prefers the
+   * lowest rung for a fast start. Defaults to `auto`.
+   */
+  initialQuality?: InitialQuality;
+  /**
+   * Override video URI selection (qualities / videoUri). Useful for network
+   * or experiment-driven source choice in the app.
+   */
+  resolveVideoUri?: (item: T) => string;
+
+  /**
+   * Enable react-native-video disk caching for the built-in player.
+   * When true and `bufferConfig.cacheSizeMB` is unset, uses 100 MB.
+   * Explicit `bufferConfig.cacheSizeMB` (including `0`) always wins.
+   * Ignored when `renderVideo` is provided. Defaults to false.
+   */
+  videoCacheEnabled?: boolean;
 
   /**
    * Buffer configuration for the built-in react-native-video player.

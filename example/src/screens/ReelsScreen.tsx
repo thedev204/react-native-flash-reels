@@ -167,6 +167,10 @@ export function ReelsScreen() {
         onMuteChange={setMuted}
         onLike={handleLike}
         preloadWindowSize={1}
+        prefetchEnabled
+        prefetchWindowSize={2}
+        showPosterUntilReady
+        posterBlurRadius={8}
         showProgressBar
         showBufferingLoader
         refreshing={refreshing}

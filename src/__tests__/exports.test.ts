@@ -5,5 +5,6 @@ describe('public API', () => {
     expect(FlashReels.FlashReels).toBeDefined();
     expect(FlashReels.MuteButton).toBeDefined();
     expect(FlashReels.useFlashReels).toBeDefined();
+    expect(FlashReels.DEFAULT_VIDEO_CACHE_SIZE_MB).toBe(100);
   });
 });

@@ -5,7 +5,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'Flash Reels',
   tagline:
-    'High-performance vertical video feeds for React Native — FlashList v2 + New Architecture',
+    'High-performance vertical video feeds for React Native — prefetch, poster-first, and FlashList v2',
   favicon: 'img/favicon.png',
 
   future: {

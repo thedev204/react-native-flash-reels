@@ -5,7 +5,26 @@ title: Performance
 
 # Performance
 
-## Preload window
+Flash Reels separates **decoder preload** (mounting `Video`) from **HTTP prefetch** (warming posters / tiny Range requests) and optional **disk cache**. Use them together for Instagram-like swipe-in feel — keep the decoder window small on Android.
+
+## Recommended recipe
+
+```tsx
+<FlashReels
+  data={data}
+  preloadWindowSize={1}
+  prefetchEnabled
+  prefetchWindowSize={2}
+  prefetchStrategy="directional"
+  showPosterUntilReady
+  posterBlurRadius={10}
+  videoCacheEnabled
+/>
+```
+
+Provide `posterUri` (and ideally `duration`) on each reel. Rank `data` on your backend; optionally set `prefetchPriority` so warmer items prefetch first.
+
+## Decoder preload window
 
 Only `activeIndex ± preloadWindowSize` items mount a real video source. Everything else shows the poster (or a blank fallback).
 
@@ -15,6 +34,96 @@ This is the main lever for **Android decoder limits** — keep `preloadWindowSiz
 <FlashReels data={data} preloadWindowSize={1} />
 ```
 
+## HTTP prefetch (opt-in)
+
+`prefetchEnabled` warms upcoming posters (`Image.prefetch`) and a small HTTP `Range` of each video URI so CDN / OS caches are hot **without** mounting extra decoders. Prefetch never increases decoder count — that stays on `preloadWindowSize`.
+
+```tsx
+<FlashReels
+  data={data}
+  preloadWindowSize={1}
+  prefetchEnabled
+  prefetchWindowSize={2}
+  prefetchStrategy="directional"
+/>
+```
+
+| Prop                 | Default         | Notes                                               |
+| -------------------- | --------------- | --------------------------------------------------- |
+| `prefetchEnabled`    | `false`         | Master switch                                       |
+| `prefetchWindowSize` | `2`             | How far to warm beyond the active index             |
+| `prefetchStrategy`   | `'directional'` | Bias ahead of scroll; use `'symmetric'` for ±window |
+
+Optional `prefetchPriority` on each `ReelData` item sorts warm-up order (higher first) — pair with a ranked feed from your backend.
+
+## Poster / blur first (opt-in)
+
+Keep a **real** poster over the native surface until the first frame (`onReadyForDisplay`, with `onLoad` as fallback). Optional blur softens the wait.
+
+```tsx
+<FlashReels data={data} showPosterUntilReady posterBlurRadius={12} />
+```
+
+Requires `posterUri` on the item. Without it, the overlay is skipped so a dark fallback cannot hide the player. Ignored when `renderVideo` is set — custom engines own this UX.
+
+## Disk cache (opt-in)
+
+Uses **react-native-video** disk caching so revisited / looping progressive clips hit local storage instead of re-downloading.
+
+```tsx
+<FlashReels data={data} videoCacheEnabled />
+// or size explicitly:
+<FlashReels data={data} bufferConfig={{ cacheSizeMB: 150 }} />
+```
+
+| Platform | Notes                                                                                                                                                                                  |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Android  | `cacheSizeMB` enables ExoPlayer SimpleCache. First size set in the process wins globally.                                                                                              |
+| iOS      | Also requires `$RNVideoUseVideoCaching=true` in the **app** Podfile (see [Installation](./installation)). Progressive `.mp4` / `.m4v` / `.mov` only — HLS usually bypasses this cache. |
+
+`videoCacheEnabled` defaults to **100 MB** (`DEFAULT_VIDEO_CACHE_SIZE_MB`) when `cacheSizeMB` is unset. Set `cacheSizeMB: 0` to force caching off while keeping other buffer knobs. Ignored when `renderVideo` is set.
+
+Prefetch warms the network path; disk cache helps **replay / revisit**. Use both for best results on progressive MP4 feeds.
+
+## Adaptive bitrate & quality ladders
+
+**Preferred:** put an HLS (`.m3u8`) or DASH URI in `videoUri`. Native players handle ABR; tune with `bufferConfig.preferredPeakBitRate` / `preferredMaximumResolution` where supported.
+
+**Progressive MP4 ladder:** set `qualities` and `initialQuality` (`auto` / `low` / `high`). `auto` picks the **lowest** rung for a fast first paint. Or override with `resolveVideoUri`.
+
+```tsx
+const item = {
+  id: '1',
+  videoUri: 'https://cdn.example.com/reel.m3u8', // ABR
+  // Or progressive ladder:
+  // videoUri: 'https://cdn.example.com/reel-720.mp4',
+  // qualities: [
+  //   { uri: '…/480.mp4', bandwidth: 800_000, height: 480 },
+  //   { uri: '…/1080.mp4', bandwidth: 4_000_000, height: 1080 },
+  // ],
+};
+```
+
+### Tiny first chunk
+
+Encode short initial HLS segments (≈1–2s) and ensure your CDN supports HTTP `Range`. That is an encoding / CDN concern — the library’s Range prefetch only warms the edge.
+
+## CDN & edge caching
+
+Checklist for your media origin:
+
+- Cache-Control / CDN TTLs for posters and video segments
+- Edge POPs close to users
+- HTTP `Range` support (required for hint prefetch and seeking)
+- Prefer HLS/DASH over multi-GB progressive MP4s
+- Signed URLs with stable cache keys when possible
+
+## Feed ranking & predictive prefetch
+
+Rank on your **backend** (engagement, freshness, following). Pass already-ordered `data` into `FlashReels`. Optionally set `prefetchPriority` so warmer items prefetch first. With `prefetchStrategy="directional"`, the library biases ahead of the user’s scroll direction.
+
+The library does **not** include a ranking algorithm.
+
 ## Memoization
 
 - `ReelItem` is memoized internally.
@@ -22,4 +131,4 @@ This is the main lever for **Android decoder limits** — keep `preloadWindowSiz
 
 ## `removeClippedSubviews`
 
-Left **off** by default. It has caused video-surface quirks on some Android versions. Treat it as an opt-in experiment if you need it in your own fork or wrapper.
+Kept **off**. FlashList v2 already recycles cells; enabling native `removeClippedSubviews` on Android commonly blanks `react-native-video` surfaces (permanent black frames).

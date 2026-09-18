@@ -152,3 +152,35 @@ const [muted, setMuted] = useState(true);
 
 <FlashReels data={data} muted={muted} onMuteChange={setMuted} />;
 ```
+
+## Performance features (opt-in)
+
+Enable HTTP/poster prefetch, poster-until-ready, and optional disk cache for snappier swipes. Full guidance (HLS ABR, CDN, ranking) is in [Performance](./performance).
+
+```tsx
+<FlashReels
+  data={data}
+  preloadWindowSize={1}
+  prefetchEnabled
+  prefetchWindowSize={2}
+  prefetchStrategy="directional"
+  showPosterUntilReady
+  posterBlurRadius={10}
+  videoCacheEnabled
+/>
+```
+
+| Prop                   | Role                                                           |
+| ---------------------- | -------------------------------------------------------------- |
+| `prefetchEnabled`      | Warm posters + tiny video `Range` requests (no extra decoders) |
+| `prefetchWindowSize`   | How many items ahead to warm (default `2`)                     |
+| `prefetchStrategy`     | `'directional'` (bias ahead of scroll) or `'symmetric'`        |
+| `showPosterUntilReady` | Keep `posterUri` visible until first frame                     |
+| `videoCacheEnabled`    | RN Video disk cache (default 100 MB)                           |
+
+Tips:
+
+- Pass `posterUri` when using `showPosterUntilReady`.
+- Keep `preloadWindowSize` at `1` on Android unless you have headroom for more decoders.
+- On iOS, disk cache also needs `$RNVideoUseVideoCaching=true` in your Podfile — see [Installation](./installation).
+- Optional `prefetchPriority` on each item (from your ranked API) controls warm-up order.

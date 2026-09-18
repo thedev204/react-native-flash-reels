@@ -55,3 +55,14 @@ export default function App() {
   );
 }
 ```
+
+## iOS video disk cache (optional)
+
+To use `videoCacheEnabled` / `bufferConfig.cacheSizeMB` on iOS, enable react-native-video’s caching flag in your app Podfile, then reinstall pods:
+
+```ruby title="ios/Podfile"
+# Enable react-native-video disk caching (progressive MP4/M4V/MOV)
+$RNVideoUseVideoCaching = true
+```
+
+You may also need the CocoaPods Swift modular-headers gem — see [react-native-video caching docs](https://docs.thewidlarzgroup.com/react-native-video/). Android only needs `videoCacheEnabled` or `cacheSizeMB` at runtime.

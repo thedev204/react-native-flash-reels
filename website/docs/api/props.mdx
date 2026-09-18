@@ -4,32 +4,40 @@ title: Props
 
 # FlashReels props
 
-| Prop                    | Type                        | Default        | Description                                                                                              |
-| ----------------------- | --------------------------- | -------------- | -------------------------------------------------------------------------------------------------------- |
-| `data`                  | `T extends ReelData[]`      | —              | Feed items (`id`, `videoUri`, optional `posterUri`, optional `duration`)                                 |
-| `muted`                 | `boolean`                   | —              | Controlled mute                                                                                          |
-| `defaultMuted`          | `boolean`                   | `true`         | Uncontrolled default                                                                                     |
-| `onMuteChange`          | `(muted: boolean) => void`  | —              | Mute changes                                                                                             |
-| `loop`                  | `boolean`                   | `true`         | Loop active video                                                                                        |
-| `onLike`                | `(item, index) => void`     | —              | Fired on double-tap like                                                                                 |
-| `onDoubleTap`           | `(item, index) => void`     | —              | Fired on double-tap                                                                                      |
-| `onIndexChange`         | `(index: number) => void`   | —              | Active reel changed                                                                                      |
-| `renderOverlay`         | `(item, meta) => ReactNode` | —              | Per-item overlay slot                                                                                    |
-| `renderVideo`           | `(item, meta) => ReactNode` | —              | Swap video engine                                                                                        |
-| `likeIcon`              | `ReactNode`                 | built-in heart | Double-tap heart                                                                                         |
-| `preloadWindowSize`     | `number`                    | `1`            | Neighbors that keep a real video source                                                                  |
-| `bufferConfig`          | `VideoBufferConfig`         | —              | Built-in player buffer tuning                                                                            |
-| `showProgressBar`       | `boolean`                   | `false`        | Bottom progress bar (built-in player). Pass `duration` on each item — [see Usage](../usage#progress-bar) |
-| `progressBarStyle`      | `ViewStyle`                 | —              | Progress bar track style                                                                                 |
-| `onEndReached`          | `() => void`                | —              | Near end of feed — parent appends pages                                                                  |
-| `onEndReachedThreshold` | `number`                    | `0.5`          | How close to the end before `onEndReached`                                                               |
-| `ListFooterComponent`   | `ReactElement \| null`      | —              | Optional load-more footer                                                                                |
-| `refreshing`            | `boolean`                   | `false`        | Controlled pull-to-refresh spinner                                                                       |
-| `onRefresh`             | `() => void`                | —              | Enables pull-to-refresh                                                                                  |
-| `showBufferingLoader`   | `boolean`                   | `false`        | Built-in buffering spinner (built-in player only)                                                        |
-| `renderBufferingLoader` | `() => ReactNode`           | —              | Custom buffering UI (replaces default)                                                                   |
-| `containerStyle`        | `ViewStyle`                 | —              | Outer container                                                                                          |
-| `videoStyle`            | `ViewStyle`                 | —              | Default video style                                                                                      |
+| Prop                    | Type                           | Default         | Description                                                                                              |
+| ----------------------- | ------------------------------ | --------------- | -------------------------------------------------------------------------------------------------------- |
+| `data`                  | `T extends ReelData[]`         | —               | Feed items (`id`, `videoUri`, optional `posterUri`, `duration`, `qualities`, `prefetchPriority`)         |
+| `muted`                 | `boolean`                      | —               | Controlled mute                                                                                          |
+| `defaultMuted`          | `boolean`                      | `true`          | Uncontrolled default                                                                                     |
+| `onMuteChange`          | `(muted: boolean) => void`     | —               | Mute changes                                                                                             |
+| `loop`                  | `boolean`                      | `true`          | Loop active video                                                                                        |
+| `onLike`                | `(item, index) => void`        | —               | Fired on double-tap like                                                                                 |
+| `onDoubleTap`           | `(item, index) => void`        | —               | Fired on double-tap                                                                                      |
+| `onIndexChange`         | `(index: number) => void`      | —               | Active reel changed                                                                                      |
+| `renderOverlay`         | `(item, meta) => ReactNode`    | —               | Per-item overlay slot                                                                                    |
+| `renderVideo`           | `(item, meta) => ReactNode`    | —               | Swap video engine                                                                                        |
+| `likeIcon`              | `ReactNode`                    | built-in heart  | Double-tap heart                                                                                         |
+| `preloadWindowSize`     | `number`                       | `1`             | Neighbors that keep a real video source (decoder cap)                                                    |
+| `prefetchEnabled`       | `boolean`                      | `false`         | Warm posters + tiny video Range requests (no extra decoders)                                             |
+| `prefetchWindowSize`    | `number`                       | `2`             | How far to prefetch beyond the active index                                                              |
+| `prefetchStrategy`      | `'symmetric' \| 'directional'` | `'directional'` | Prefetch layout; directional biases ahead of scroll                                                      |
+| `showPosterUntilReady`  | `boolean`                      | `false`         | Keep `posterUri` over video until first frame (built-in player)                                          |
+| `posterBlurRadius`      | `number`                       | `0`             | Blur on poster while waiting / outside decoder window                                                    |
+| `initialQuality`        | `'auto' \| 'low' \| 'high'`    | `'auto'`        | Which `qualities` rung to play first (`auto` = lowest)                                                   |
+| `resolveVideoUri`       | `(item: T) => string`          | —               | Override URI selection                                                                                   |
+| `videoCacheEnabled`     | `boolean`                      | `false`         | Opt-in RN Video disk cache (default 100 MB). Ignored with `renderVideo`                                  |
+| `bufferConfig`          | `VideoBufferConfig`            | —               | Built-in player buffer / ABR / `cacheSizeMB`                                                             |
+| `showProgressBar`       | `boolean`                      | `false`         | Bottom progress bar (built-in player). Pass `duration` on each item — [see Usage](../usage#progress-bar) |
+| `progressBarStyle`      | `ViewStyle`                    | —               | Progress bar track style                                                                                 |
+| `onEndReached`          | `() => void`                   | —               | Near end of feed — parent appends pages                                                                  |
+| `onEndReachedThreshold` | `number`                       | `0.5`           | How close to the end before `onEndReached`                                                               |
+| `ListFooterComponent`   | `ReactElement \| null`         | —               | Optional load-more footer                                                                                |
+| `refreshing`            | `boolean`                      | `false`         | Controlled pull-to-refresh spinner                                                                       |
+| `onRefresh`             | `() => void`                   | —               | Enables pull-to-refresh                                                                                  |
+| `showBufferingLoader`   | `boolean`                      | `false`         | Built-in buffering spinner (built-in player only)                                                        |
+| `renderBufferingLoader` | `() => ReactNode`              | —               | Custom buffering UI (replaces default)                                                                   |
+| `containerStyle`        | `ViewStyle`                    | —               | Outer container                                                                                          |
+| `videoStyle`            | `ViewStyle`                    | —               | Default video style                                                                                      |
 
 ## Ref methods
 

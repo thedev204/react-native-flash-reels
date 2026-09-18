@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-09-18
+
+### Added
+
+- Opt-in RN Video **disk cache** via `videoCacheEnabled` (default **100 MB**) and `bufferConfig.cacheSizeMB`.
+- Exported `DEFAULT_VIDEO_CACHE_SIZE_MB` for consumers that want the same default.
+- Installation docs for iOS `$RNVideoUseVideoCaching` Podfile flag.
+- Expanded Performance guide: prefetch vs decoder preload, poster-first, ABR ladders, CDN checklist, feed ranking, disk cache.
+
+### Fixed
+
+- Permanent **black video** on Android when `removeClippedSubviews` was enabled with FlashList v2 — now always off.
+- Video surface no longer wrapped in `GestureDetector` (transparent gesture layer instead) to avoid blank Android surfaces.
+- `showPosterUntilReady` no longer covers the player with a dark fallback when `posterUri` is missing; clears waiting state on `onLoad` if `onReadyForDisplay` is flaky.
+
+### Docs
+
+- README quick start and Performance section for prefetch / poster-first / disk cache.
+- Website intro, usage, props, types, and performance pages aligned with the new APIs.
+
+---
+
+## [0.2.0] - 2026-09-09
+
+### Added
+
+- Opt-in HTTP/poster **prefetch** (`prefetchEnabled`, `prefetchWindowSize`, `prefetchStrategy`) independent of the decoder preload window.
+- Opt-in **poster / blur-first** until first frame (`showPosterUntilReady`, `posterBlurRadius`).
+- Optional progressive **quality ladder** on `ReelData` (`qualities`, `initialQuality`, `resolveVideoUri`).
+- Optional `prefetchPriority` on feed items for ranked warm-up order.
+- ABR-oriented buffer hints on `VideoBufferConfig` (`preferredPeakBitRate`, `preferredMaximumResolution`).
+- Performance docs covering HLS ABR, tiny first chunk, CDN/edge caching, and app-owned feed ranking.
+
+---
+
 ## [0.1.0] - 2026-09-04
 
 ### Added
