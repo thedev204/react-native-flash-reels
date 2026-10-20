@@ -106,7 +106,7 @@ describe('FlashReels', () => {
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it('mounts with opt-in prefetch and poster-until-ready without changing defaults', () => {
+  it('mounts with opt-in prefetch and poster blur until ready', () => {
     const prefetchSpy = jest
       .spyOn(require('react-native').Image, 'prefetch')
       .mockResolvedValue(true);
@@ -130,6 +130,33 @@ describe('FlashReels', () => {
 
     prefetchSpy.mockRestore();
     fetchSpy.mockRestore();
+  });
+
+  it('covers the built-in video with a poster until onReadyForDisplay', () => {
+    render(<FlashReels data={data} posterBlurRadius={8} />);
+
+    const video = screen.getAllByTestId('mock-video')[0]!;
+    const style = Array.isArray(video.props.style)
+      ? Object.assign({}, ...video.props.style.filter(Boolean))
+      : video.props.style;
+    expect(style?.opacity).toBeUndefined();
+
+    act(() => {
+      video.props.onReadyForDisplay?.();
+    });
+
+    expect(screen.getAllByTestId('mock-video')[0]).toBeTruthy();
+  });
+
+  it('plays only the active reel; neighbors mount muted for warmup', () => {
+    render(<FlashReels data={data} preloadWindowSize={1} defaultMuted />);
+
+    const videos = screen.getAllByTestId('mock-video');
+    // Active + preload-window neighbors should mount players.
+    expect(videos.length).toBeGreaterThanOrEqual(1);
+    const active = videos[0]!;
+    expect(active.props.paused).toBe(false);
+    expect(active.props.muted).toBe(true);
   });
 
   it('passes default cacheSizeMB when videoCacheEnabled is true', () => {

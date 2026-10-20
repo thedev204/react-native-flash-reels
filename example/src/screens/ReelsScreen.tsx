@@ -141,16 +141,6 @@ export function ReelsScreen() {
     [likedIds, handleLikePress, handleShare]
   );
 
-  const listFooter = useMemo(
-    () =>
-      loadingMore ? (
-        <View style={styles.footer}>
-          <ActivityIndicator color="#fff" />
-        </View>
-      ) : null,
-    [loadingMore]
-  );
-
   return (
     // Bottom safe area lifts the feed (progress bar). The comments sheet is
     // absolutely positioned and ignores this padding, so its composer uses
@@ -161,26 +151,38 @@ export function ReelsScreen() {
         translucent
         backgroundColor="transparent"
       />
-      <FlashReels
-        data={reels}
-        muted={muted}
-        onMuteChange={setMuted}
-        onLike={handleLike}
-        preloadWindowSize={1}
-        prefetchEnabled
-        prefetchWindowSize={2}
-        showPosterUntilReady
-        posterBlurRadius={8}
-        showProgressBar
-        showBufferingLoader
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={listFooter}
-        renderOverlay={renderOverlay}
-        likeIcon={<Ionicons name="heart" size={64} color="#ff2d55" />}
-      />
+      <View style={styles.feed}>
+        <FlashReels
+          data={reels}
+          muted={muted}
+          onMuteChange={setMuted}
+          onLike={handleLike}
+          preloadWindowSize={1}
+          preloadStrategy="directional"
+          drawDistancePages={3}
+          prefetchEnabled
+          prefetchWindowSize={2}
+          prefetchMaxConcurrent={2}
+          networkAware
+          showPosterUntilReady
+          posterBlurRadius={8}
+          showProgressBar
+          showBufferingLoader
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          renderOverlay={renderOverlay}
+          likeIcon={<Ionicons name="heart" size={64} color="#ff2d55" />}
+        />
+        {/* Overlay spinner — keep out of ListFooterComponent so page snap
+            intervals stay exactly one viewport tall. */}
+        {loadingMore ? (
+          <View pointerEvents="none" style={styles.loadingMore}>
+            <ActivityIndicator color="#fff" />
+          </View>
+        ) : null}
+      </View>
       <CommentsBottomSheet
         visible={commentsOpen}
         comments={activeComments}
@@ -214,8 +216,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  footer: {
-    height: 56,
+  feed: {
+    flex: 1,
+  },
+  loadingMore: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },

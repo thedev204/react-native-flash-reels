@@ -1,6 +1,6 @@
 {
   "name": "react-native-flash-reels",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Lightweight, customizable vertical video feed for React Native built on FlashList v2",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
@@ -33,7 +33,7 @@
   ],
   "scripts": {
     "example": "yarn workspace react-native-flash-reels-example",
-    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib coverage",
+    "clean": "del-cli example/android example/ios lib coverage",
     "prepare": "bob build",
     "typecheck": "tsc",
     "typecheck:tests": "tsc -p tsconfig.test.json --noEmit",
@@ -94,7 +94,7 @@
     "prettier": "^3.8.3",
     "react": "19.2.3",
     "react-native": "0.85.0",
-    "react-native-builder-bob": "^0.41.0",
+    "react-native-builder-bob": "^0.43.2",
     "react-native-gesture-handler": "^2.28.0",
     "react-native-reanimated": "^4.6.0",
     "react-native-video": "^6.16.0",
@@ -104,6 +104,7 @@
     "typescript": "^6.0.3"
   },
   "peerDependencies": {
+    "@react-native-community/netinfo": ">=11.0.0",
     "@shopify/flash-list": ">=2.0.0",
     "react": "*",
     "react-native": "*",
@@ -113,6 +114,9 @@
     "react-native-worklets": ">=0.12.0"
   },
   "peerDependenciesMeta": {
+    "@react-native-community/netinfo": {
+      "optional": true
+    },
     "@shopify/flash-list": {
       "optional": false
     },

@@ -54,12 +54,13 @@
 - FlashList v2 snap paging (New Architecture)
 - Auto play/pause from viewability + single-tap pause
 - Double-tap like, mute controls, optional progress bar
-- **Opt-in HTTP/poster prefetch** with directional warm-up
+- **Opt-in HTTP/poster prefetch** with directional warm-up, concurrency cap, and mid-fling prediction
 - **Opt-in poster / blur-first** until the first frame
 - **Opt-in RN Video disk cache** (`videoCacheEnabled`)
 - Optional progressive quality ladder / HLS-ready ABR docs
+- Optional `networkAware` (NetInfo peer) for cellular/offline budgets
 - Custom overlay and video engine via render props
-- Decoder preload window to cap concurrent players
+- Decoder preload window to cap concurrent players (`preloadStrategy`, `drawDistancePages`)
 
 ## Requirements
 
@@ -137,19 +138,20 @@ export function ReelsScreen() {
 }
 ```
 
-## Prefetch & performance (opt-in)
-
-All of these default **off** so existing apps stay unchanged:
+## Prefetch & performance
 
 | Prop                                             | What it does                                                             |
 | ------------------------------------------------ | ------------------------------------------------------------------------ |
-| `preloadWindowSize`                              | How many neighbors mount a real `Video` decoder (default `1`)            |
+| `preloadWindowSize` / `preloadStrategy`          | Decoder neighbors (default symmetric `±1`); directional biases ahead     |
+| `drawDistancePages`                              | FlashList draw distance in pages (default `preloadWindowSize + 1`)       |
 | `prefetchEnabled`                                | Warms posters + a tiny HTTP `Range` of upcoming URIs (no extra decoders) |
 | `prefetchWindowSize` / `prefetchStrategy`        | How far / how to bias prefetch (`directional` or `symmetric`)            |
-| `showPosterUntilReady` / `posterBlurRadius`      | Keep `posterUri` visible until the first frame                           |
+| `prefetchMaxConcurrent`                          | Cap concurrent video Range warms (default `2`)                           |
+| `networkAware`                                   | Optional NetInfo peer — tune start quality / prefetch on cellular        |
+| `showPosterUntilReady` / `posterBlurRadius`      | Blurred poster until first frame (default **on**; overlay, not opacity)  |
 | `videoCacheEnabled` / `bufferConfig.cacheSizeMB` | RN Video disk cache (Android runtime; iOS needs Podfile flag)            |
 
-Pass `posterUri` when using `showPosterUntilReady`. Rank feeds on your backend and optionally set `prefetchPriority` on items.
+Mid-fling scroll prediction warms **prefetch and decoder mounts** for the landing page; playback still settles via viewability. Pass `posterUri` on each reel. Rank feeds on your backend and optionally set `prefetchPriority` on items. Install `@react-native-community/netinfo` when using `networkAware`.
 
 Full guide: **[Performance](https://thedev204.github.io/react-native-flash-reels/docs/performance)**.
 

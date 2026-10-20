@@ -1,11 +1,19 @@
 import { Image } from 'react-native';
-import type { InitialQuality, PrefetchStrategy, ReelData } from '../types';
+import type {
+  InitialQuality,
+  PrefetchStrategy,
+  ReelData,
+  ScrollDirection,
+} from '../types';
 import { resolveVideoUri } from './resolveVideoUri';
+
+export type { ScrollDirection };
 
 /** Bytes requested to warm CDN / OS HTTP cache without a full download. */
 const VIDEO_HINT_RANGE_END = 65_535;
 
-export type ScrollDirection = 1 | -1 | 0;
+/** Default concurrent video Range warm-ups when prefetch is on. */
+export const DEFAULT_PREFETCH_MAX_CONCURRENT = 2;
 
 /**
  * Indexes to warm for HTTP/poster prefetch (not decoder mounts).
@@ -80,12 +88,41 @@ const inFlightPosters = new Set<string>();
 const warmedVideos = new Set<string>();
 const inFlightVideos = new Set<string>();
 
-/** Test helper — clears module-level dedupe sets. */
+/** Active video warm AbortControllers keyed by URI. */
+const videoAbortControllers = new Map<string, AbortController>();
+
+interface QueuedVideoWarm {
+  uri: string;
+  controller: AbortController;
+}
+
+let videoWarmQueue: QueuedVideoWarm[] = [];
+let activeVideoWarms = 0;
+let maxConcurrentVideoWarms = DEFAULT_PREFETCH_MAX_CONCURRENT;
+
+/** Test helper — clears module-level dedupe sets and aborts in-flight warms. */
 export function resetPrefetchState(): void {
   warmedPosters.clear();
   inFlightPosters.clear();
   warmedVideos.clear();
   inFlightVideos.clear();
+  for (const controller of videoAbortControllers.values()) {
+    controller.abort();
+  }
+  videoAbortControllers.clear();
+  videoWarmQueue = [];
+  activeVideoWarms = 0;
+  maxConcurrentVideoWarms = DEFAULT_PREFETCH_MAX_CONCURRENT;
+}
+
+export function setPrefetchMaxConcurrent(max: number): void {
+  maxConcurrentVideoWarms = Math.max(0, Math.floor(max));
+  pumpVideoWarmQueue();
+}
+
+/** Whether a video URI has completed an HTTP Range warm-up this session. */
+export function isVideoWarmed(uri: string): boolean {
+  return Boolean(uri) && warmedVideos.has(uri);
 }
 
 export function prefetchPosters(uris: readonly string[]): void {
@@ -107,38 +144,117 @@ export function prefetchPosters(uris: readonly string[]): void {
   }
 }
 
-async function warmVideoUri(uri: string): Promise<void> {
+async function warmVideoUri(uri: string, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    return;
+  }
   try {
     const response = await fetch(uri, {
       method: 'GET',
       headers: {
         Range: `bytes=0-${VIDEO_HINT_RANGE_END}`,
       },
+      signal,
     });
+    if (signal.aborted) {
+      return;
+    }
     // Drain a little so some runtimes actually complete the Range request.
     await response.arrayBuffer();
-  } catch {
+  } catch (error) {
+    if (signal.aborted) {
+      return;
+    }
+    const name =
+      error && typeof error === 'object' && 'name' in error
+        ? String((error as { name?: string }).name)
+        : '';
+    if (name === 'AbortError') {
+      return;
+    }
     try {
-      await fetch(uri, { method: 'HEAD' });
+      await fetch(uri, { method: 'HEAD', signal });
     } catch {
       // Soft-fail — decoder preload / playback still work.
     }
   }
 }
 
-export function prefetchVideoHints(uris: readonly string[]): void {
-  for (const uri of uris) {
-    if (!uri || warmedVideos.has(uri) || inFlightVideos.has(uri)) {
+function pumpVideoWarmQueue(): void {
+  while (
+    activeVideoWarms < maxConcurrentVideoWarms &&
+    videoWarmQueue.length > 0
+  ) {
+    const next = videoWarmQueue.shift();
+    if (!next) {
+      break;
+    }
+    const { uri, controller } = next;
+    if (controller.signal.aborted) {
+      inFlightVideos.delete(uri);
+      videoAbortControllers.delete(uri);
       continue;
     }
-    inFlightVideos.add(uri);
-    warmVideoUri(uri)
+    activeVideoWarms += 1;
+    warmVideoUri(uri, controller.signal)
       .then(() => {
-        warmedVideos.add(uri);
+        if (!controller.signal.aborted) {
+          warmedVideos.add(uri);
+        }
       })
       .finally(() => {
+        activeVideoWarms = Math.max(0, activeVideoWarms - 1);
         inFlightVideos.delete(uri);
+        videoAbortControllers.delete(uri);
+        pumpVideoWarmQueue();
       });
+  }
+}
+
+function enqueueVideoWarm(uri: string): void {
+  if (
+    !uri ||
+    warmedVideos.has(uri) ||
+    inFlightVideos.has(uri) ||
+    maxConcurrentVideoWarms <= 0
+  ) {
+    return;
+  }
+  const controller = new AbortController();
+  inFlightVideos.add(uri);
+  videoAbortControllers.set(uri, controller);
+  videoWarmQueue.push({ uri, controller });
+  pumpVideoWarmQueue();
+}
+
+/**
+ * Abort video warms whose URIs are no longer in the desired set.
+ * Posters are left alone (cheap + useful on reverse scroll).
+ */
+export function abortVideoWarmsOutside(keepUris: ReadonlySet<string>): void {
+  for (const [uri, controller] of [...videoAbortControllers.entries()]) {
+    if (keepUris.has(uri)) {
+      continue;
+    }
+    controller.abort();
+    videoAbortControllers.delete(uri);
+    inFlightVideos.delete(uri);
+  }
+  videoWarmQueue = videoWarmQueue.filter((item) => {
+    if (keepUris.has(item.uri)) {
+      return true;
+    }
+    item.controller.abort();
+    inFlightVideos.delete(item.uri);
+    return false;
+  });
+}
+
+export function prefetchVideoHints(uris: readonly string[]): void {
+  const keep = new Set(uris.filter(Boolean));
+  abortVideoWarmsOutside(keep);
+  for (const uri of uris) {
+    enqueueVideoWarm(uri);
   }
 }
 
@@ -150,6 +266,7 @@ export function runFeedPrefetch<T extends ReelData>(options: {
   direction: ScrollDirection;
   initialQuality?: InitialQuality;
   resolveVideoUri?: (item: T) => string;
+  maxConcurrent?: number;
 }): void {
   const {
     data,
@@ -159,7 +276,15 @@ export function runFeedPrefetch<T extends ReelData>(options: {
     direction,
     initialQuality = 'auto',
     resolveVideoUri: customResolve,
+    maxConcurrent = DEFAULT_PREFETCH_MAX_CONCURRENT,
   } = options;
+
+  if (windowSize <= 0 || maxConcurrent <= 0) {
+    abortVideoWarmsOutside(new Set());
+    return;
+  }
+
+  setPrefetchMaxConcurrent(maxConcurrent);
 
   const indexes = sortIndexesByPrefetchPriority(
     getPrefetchIndexes(
@@ -172,6 +297,7 @@ export function runFeedPrefetch<T extends ReelData>(options: {
     data
   );
 
+  // Posters first (cheap first-frame), then video Range hints.
   const posters: string[] = [];
   const videos: string[] = [];
 

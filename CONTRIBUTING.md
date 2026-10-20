@@ -27,6 +27,14 @@ It is configured to use the local version of the library, so any changes you mak
 
 You can use various commands from the root directory to work with the project.
 
+The example app uses [Expo Prebuild](https://docs.expo.dev/workflow/prebuild/) (continuous native generation). Native `android/` and `ios/` folders are generated locally and gitignored.
+
+Generate native projects (once, or after changing native config / plugins):
+
+```sh
+yarn example prebuild
+```
+
 To start the packager:
 
 ```sh
@@ -45,10 +53,12 @@ To run the example app on iOS:
 yarn example ios
 ```
 
+`yarn example android` / `ios` will run prebuild automatically if the native folders are missing.
+
 To confirm that the app is running with the new architecture, you can check the Metro logs for a message like this:
 
 ```sh
-Running "FlashReelsExample" with {"fabric":true,"initialProps":{"concurrentRoot":true},"rootTag":1}
+Running "main" with {"fabric":true,"initialProps":{"concurrentRoot":true},"rootTag":1}
 ```
 
 Note the `"fabric":true` and `"concurrentRoot":true` properties.
@@ -108,9 +118,10 @@ The `package.json` file contains various scripts for common tasks:
 - `yarn format` / `yarn format:check`: format with Prettier.
 - `yarn test` / `yarn test:coverage`: run Jest unit tests.
 - `yarn validate`: typecheck + lint + format check + tests.
-- `yarn example start`: start the Metro server for the example app.
-- `yarn example android`: run the example app on Android.
-- `yarn example ios`: run the example app on iOS.
+- `yarn example start`: start the Expo / Metro server for the example app.
+- `yarn example prebuild`: generate `example/android` and `example/ios` via Expo Prebuild.
+- `yarn example android`: run the example app on Android (`expo run:android`).
+- `yarn example ios`: run the example app on iOS (`expo run:ios`).
 
 ### Sending a pull request
 

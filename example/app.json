@@ -1,4 +1,34 @@
 {
-  "name": "FlashReelsExample",
-  "displayName": "FlashReelsExample"
+  "expo": {
+    "name": "FlashReelsExample",
+    "slug": "flash-reels-example",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "flashreels.example"
+    },
+    "android": {
+      "package": "flashreels.example"
+    },
+    "plugins": [
+      [
+        "react-native-video",
+        {
+          "enableCacheExtension": true
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "packagingOptions": {
+              "pickFirst": ["**/libworklets.so"]
+            }
+          }
+        }
+      ]
+    ]
+  }
 }

@@ -12,6 +12,7 @@
         "src/*.ts",
         "src/*.tsx",
         "example/package.json",
+        "example/app.json",
         "example/android",
         "!example/android/.gradle",
         "!example/android/build",
@@ -33,6 +34,7 @@
         "src/*.ts",
         "src/*.tsx",
         "example/package.json",
+        "example/app.json",
         "example/ios",
         "!example/ios/build",
         "!example/ios/Pods"

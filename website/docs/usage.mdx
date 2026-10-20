@@ -161,26 +161,35 @@ Enable HTTP/poster prefetch, poster-until-ready, and optional disk cache for sna
 <FlashReels
   data={data}
   preloadWindowSize={1}
+  preloadStrategy="directional"
+  drawDistancePages={3}
   prefetchEnabled
   prefetchWindowSize={2}
   prefetchStrategy="directional"
   showPosterUntilReady
   posterBlurRadius={10}
   videoCacheEnabled
+  networkAware
 />
 ```
 
 | Prop                   | Role                                                           |
 | ---------------------- | -------------------------------------------------------------- |
+| `preloadStrategy`      | `'symmetric'` (default) or `'directional'` decoder slots       |
+| `drawDistancePages`    | FlashList draw distance in pages (independent of decoders)     |
 | `prefetchEnabled`      | Warm posters + tiny video `Range` requests (no extra decoders) |
 | `prefetchWindowSize`   | How many items ahead to warm (default `2`)                     |
 | `prefetchStrategy`     | `'directional'` (bias ahead of scroll) or `'symmetric'`        |
-| `showPosterUntilReady` | Keep `posterUri` visible until first frame                     |
+| `networkAware`         | Optional NetInfo peer — cellular/offline quality + prefetch    |
+| `showPosterUntilReady` | Blurred poster until first frame (default **on**)              |
 | `videoCacheEnabled`    | RN Video disk cache (default 100 MB)                           |
 
 Tips:
 
-- Pass `posterUri` when using `showPosterUntilReady`.
+- Pass `posterUri` on every reel — the built-in player opacity-gates the surface until ready either way.
 - Keep `preloadWindowSize` at `1` on Android unless you have headroom for more decoders.
+- Avoid non-page-height `ListFooterComponent` loaders (they break equal-interval snap); overlay a spinner instead.
+- Raise `drawDistancePages` for smoother flings without mounting more videos.
+- Install `@react-native-community/netinfo` when using `networkAware`.
 - On iOS, disk cache also needs `$RNVideoUseVideoCaching=true` in your Podfile — see [Installation](./installation).
 - Optional `prefetchPriority` on each item (from your ranked API) controls warm-up order.

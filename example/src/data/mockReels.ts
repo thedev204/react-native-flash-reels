@@ -11,30 +11,47 @@ export interface MockReel extends ReelData {
  * Portrait ~1080x1920 Pexels clips for the demo (verified reachable).
  * Avoid 4K / UHD sources — they often fail to decode or stay black on mid-range
  * Android devices. `duration` is seconds (ffprobe) for a responsive progress bar.
+ * `posterUri` covers the player until the first frame (required for smooth swipe-in).
  */
-const PEXELS_CLIPS: ReadonlyArray<{ uri: string; duration: number }> = [
+const PEXELS_CLIPS: ReadonlyArray<{
+  uri: string;
+  posterUri: string;
+  duration: number;
+}> = [
   {
-    uri: 'https://videos.pexels.com/video-files/18089052/18089052-hd_1080_1920_30fps.mp4',
-    duration: 52.308,
+    uri: 'https://videos.pexels.com/video-files/8393780/8393780-uhd_1440_2560_24fps.mp4',
+    posterUri:
+      'https://images.pexels.com/videos/8393780/pexels-photo-8393780.jpeg?auto=compress&w=1260&h=750&dpr=2',
+    duration: 9.0,
   },
   {
-    uri: 'https://videos.pexels.com/video-files/39000485/16594554_1080_1920_30fps.mp4',
-    duration: 6.9,
+    uri: 'https://videos.pexels.com/video-files/6003991/6003991-uhd_1440_2560_30fps.mp4',
+    posterUri:
+      'https://images.pexels.com/videos/6003991/4k-4k-video-account-app-6003991.jpeg?auto=compress&w=1260&h=750&dpr=2',
+    duration: 8.0,
   },
   {
     uri: 'https://videos.pexels.com/video-files/13600150/13600150-hd_1080_1920_30fps.mp4',
+    posterUri:
+      'https://images.pexels.com/videos/13600150/drone-lauterbrunnen-switzerland-waterfall-13600150.jpeg?auto=compress&w=1260&h=750&dpr=2',
     duration: 20.153,
   },
   {
     uri: 'https://videos.pexels.com/video-files/35132819/14883418_1080_1920_30fps.mp4',
+    posterUri:
+      'https://images.pexels.com/videos/35132819/1080x1920-cappadocia-goreme-mountainscape-35132819.jpeg?auto=compress&w=1260&h=750&dpr=2',
     duration: 22.0,
   },
   {
     uri: 'https://videos.pexels.com/video-files/30098016/12908063_1080_1920_30fps.mp4',
+    posterUri:
+      'https://images.pexels.com/videos/30098016/pexels-photo-30098016.jpeg?auto=compress&w=1260&h=750&dpr=2',
     duration: 23.0,
   },
   {
     uri: 'https://videos.pexels.com/video-files/35475885/15029369_1440_2560_25fps.mp4',
+    posterUri:
+      'https://images.pexels.com/videos/35475885/console-gaming-controller-gaming-intense-35475885.jpeg?auto=compress&w=1260&h=750&dpr=2',
     duration: 33.0,
   },
 ];
@@ -141,6 +158,7 @@ export const mockReels: MockReel[] = META.map((meta, index) => {
   return {
     id: String(index + 1),
     videoUri: clip.uri,
+    posterUri: clip.posterUri,
     duration: clip.duration,
     ...meta,
   };

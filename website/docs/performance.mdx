@@ -13,30 +13,57 @@ Flash Reels separates **decoder preload** (mounting `Video`) from **HTTP prefetc
 <FlashReels
   data={data}
   preloadWindowSize={1}
+  preloadStrategy="directional"
+  drawDistancePages={3}
   prefetchEnabled
   prefetchWindowSize={2}
   prefetchStrategy="directional"
+  prefetchMaxConcurrent={2}
   showPosterUntilReady
   posterBlurRadius={10}
   videoCacheEnabled
+  networkAware
 />
 ```
 
-Provide `posterUri` (and ideally `duration`) on each reel. Rank `data` on your backend; optionally set `prefetchPriority` so warmer items prefetch first.
+Provide `posterUri` (and ideally `duration`) on each reel — `showPosterUntilReady` defaults to **on**, and the built-in player covers the surface with a poster overlay until the first frame (avoids black / Android scale-in; Video opacity is never toggled). Rank `data` on your backend; optionally set `prefetchPriority` so warmer items prefetch first. Install `@react-native-community/netinfo` when using `networkAware`.
 
 ## Decoder preload window
 
-Only `activeIndex ± preloadWindowSize` items mount a real video source. Everything else shows the poster (or a blank fallback).
+Only neighbors of `activeIndex` within `preloadWindowSize` mount a real video source (layout depends on `preloadStrategy`). Everything else shows the poster (or a blank fallback).
 
 This is the main lever for **Android decoder limits** — keep `preloadWindowSize` small (default `1`) unless you have a strong reason to raise it.
 
 ```tsx
-<FlashReels data={data} preloadWindowSize={1} />
+<FlashReels data={data} preloadWindowSize={1} preloadStrategy="symmetric" />
 ```
+
+| Prop                | Default       | Notes                                                      |
+| ------------------- | ------------- | ---------------------------------------------------------- |
+| `preloadWindowSize` | `1`           | Decoder neighborhood size                                  |
+| `preloadStrategy`   | `'symmetric'` | `directional` keeps more slots ahead of scroll than behind |
+
+## List draw distance
+
+`drawDistancePages` controls how far FlashList keeps cells mounted (in page heights). It defaults to `preloadWindowSize + 1`. Raise it for smoother fling recycling **without** mounting more video decoders.
+
+```tsx
+<FlashReels data={data} preloadWindowSize={1} drawDistancePages={3} />
+```
+
+## Fast scroll prediction
+
+During flings, `onScroll` predicts the landing page from offset/velocity. **Playback** still settles via viewability (`activeIndex`). Prediction biases:
+
+- directional poster / Range prefetch
+
+Decoder mounts stay centered on settled `activeIndex` (Android mounts a player for the **active reel only** — multiple ExoPlayer SurfaceViews in FlashList commonly go permanently black). Neighbors show `posterUri` until they become active.
 
 ## HTTP prefetch (opt-in)
 
-`prefetchEnabled` warms upcoming posters (`Image.prefetch`) and a small HTTP `Range` of each video URI so CDN / OS caches are hot **without** mounting extra decoders. Prefetch never increases decoder count — that stays on `preloadWindowSize`.
+`prefetchEnabled` warms upcoming posters (`Image.prefetch`) **first**, then a small HTTP `Range` of each video URI so CDN / OS caches are hot **without** mounting extra decoders. Prefetch never increases decoder count — that stays on `preloadWindowSize`.
+
+Video Range warms are concurrency-capped (`prefetchMaxConcurrent`, default `2`) and aborted when they leave the predicted window.
 
 ```tsx
 <FlashReels
@@ -45,16 +72,36 @@ This is the main lever for **Android decoder limits** — keep `preloadWindowSiz
   prefetchEnabled
   prefetchWindowSize={2}
   prefetchStrategy="directional"
+  prefetchMaxConcurrent={2}
 />
 ```
 
-| Prop                 | Default         | Notes                                               |
-| -------------------- | --------------- | --------------------------------------------------- |
-| `prefetchEnabled`    | `false`         | Master switch                                       |
-| `prefetchWindowSize` | `2`             | How far to warm beyond the active index             |
-| `prefetchStrategy`   | `'directional'` | Bias ahead of scroll; use `'symmetric'` for ±window |
+| Prop                    | Default         | Notes                                               |
+| ----------------------- | --------------- | --------------------------------------------------- |
+| `prefetchEnabled`       | `false`         | Master switch                                       |
+| `prefetchWindowSize`    | `2`             | How far to warm beyond the active / predicted index |
+| `prefetchStrategy`      | `'directional'` | Bias ahead of scroll; use `'symmetric'` for ±window |
+| `prefetchMaxConcurrent` | `2`             | Max concurrent video Range warms                    |
 
 Optional `prefetchPriority` on each `ReelData` item sorts warm-up order (higher first) — pair with a ranked feed from your backend.
+
+## Network-aware quality (opt-in)
+
+`networkAware` uses the optional `@react-native-community/netinfo` peer to tune **start quality** and **prefetch budget** (not a full ABR stack — prefer HLS/DASH on the CDN for that):
+
+| Link     | Effect                                                                         |
+| -------- | ------------------------------------------------------------------------------ |
+| Wi‑Fi    | Keep consumer `initialQuality` / prefetch knobs                                |
+| Cellular | `auto` → `low`; shrink prefetch window/concurrency; optional peak bitrate hint |
+| Offline  | Skip prefetch                                                                  |
+
+Custom `resolveVideoUri` still wins. If NetInfo is missing, `networkAware` is a no-op with a one-time dev warning.
+
+```tsx
+<FlashReels data={data} prefetchEnabled networkAware />
+```
+
+You can also import `getNetworkAwareDefaults` for app-owned QoS.
 
 ## Poster / blur first (opt-in)
 

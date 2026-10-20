@@ -17,13 +17,19 @@ yarn add react-native-flash-reels @shopify/flash-list react-native-video react-n
 
 ## Peer dependencies
 
-| Package                        | Notes                                       |
-| ------------------------------ | ------------------------------------------- |
-| `@shopify/flash-list`          | v2+ (New Architecture)                      |
-| `react-native-video`           | Default player; swappable via `renderVideo` |
-| `react-native-reanimated`      | Like animation (v4+, New Architecture)      |
-| `react-native-worklets`        | Required by Reanimated 4                    |
-| `react-native-gesture-handler` | Single vs double tap                        |
+| Package                           | Notes                                                |
+| --------------------------------- | ---------------------------------------------------- |
+| `@shopify/flash-list`             | v2+ (New Architecture)                               |
+| `react-native-video`              | Default player; swappable via `renderVideo`          |
+| `react-native-reanimated`         | Like animation (v4+, New Architecture)               |
+| `react-native-worklets`           | Required by Reanimated 4                             |
+| `react-native-gesture-handler`    | Single vs double tap                                 |
+| `@react-native-community/netinfo` | **Optional** — only needed when using `networkAware` |
+
+```bash
+# Optional — for networkAware start quality / prefetch budgets
+npm install @react-native-community/netinfo
+```
 
 ## Babel
 

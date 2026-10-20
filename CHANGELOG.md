@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-10-20
+
+### Added
+
+- Mid-fling **scroll prediction** — prefetch / decoder warm-up from offset + velocity; playback still settles via viewability.
+- Decoder window **unions** `activeIndex` + `predictedIndex` so the landing page mounts before settle.
+- Muted **first-frame warmup** for preloaded neighbors (unblocks `onReadyForDisplay` on Android).
+- `drawDistancePages` — FlashList draw distance independent of the decoder window (default `preloadWindowSize + 1`).
+- `preloadStrategy` (`symmetric` \| `directional`) — optional directional decoder slots ahead of scroll.
+- Prefetch **concurrency cap** (`prefetchMaxConcurrent`, default `2`), poster-first warm-up, and abortable video Range fetches.
+- Optional `networkAware` + optional peer `@react-native-community/netinfo` for cellular/offline start-quality and prefetch budgets.
+- Exported helpers: `predictScrollTarget`, `getNetworkAwareDefaults`, `networkKindFromNetInfoType`, `DEFAULT_PREFETCH_MAX_CONCURRENT`.
+
+### Changed
+
+- `showPosterUntilReady` now defaults to **`true`**. Built-in player covers the surface with a poster overlay until `onReadyForDisplay` / first `onProgress` (never toggles Video `opacity` — that caused permanent black frames on Android).
+- Full-page snap: `pagingEnabled` on iOS; Android uses `snapToInterval` + `decelerationRate="fast"`. Settle-to-nearest-page runs on momentum end (and drag-end only when there is no fling velocity) so flings are not cancelled.
+- Example app migrated from bare React Native to **Expo**.
+
+### Fixed
+
+- Scroll feeling stuck / requiring a full-page drag — settle no longer runs on `onScrollEndDrag` while momentum is in flight.
+- Poster flashing then black screen — ready fallback no longer clears the cover on bare `onLoad`; Video `opacity: 0` gating removed.
+- Prefetched / preloaded reels showing poster + loader before play — neighbors warm muted until the first frame (no remount on activate); buffering spinner only for mid-playback rebuffers; Android uses `TextureView` so covers do not suppress ready events.
+
+---
+
 ## [0.3.0] - 2026-09-18
 
 ### Added

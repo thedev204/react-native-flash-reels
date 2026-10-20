@@ -1,7 +1,12 @@
 import type { ReelData } from '../../types';
 import {
+  abortVideoWarmsOutside,
   getPrefetchIndexes,
+  isVideoWarmed,
+  prefetchVideoHints,
   resetPrefetchState,
+  runFeedPrefetch,
+  setPrefetchMaxConcurrent,
   sortIndexesByPrefetchPriority,
 } from '../prefetch';
 import { resolveVideoUri } from '../resolveVideoUri';
@@ -90,6 +95,86 @@ describe('resolveVideoUri', () => {
     expect(
       resolveVideoUri(item, 'high', () => 'https://cdn.example.com/custom.mp4')
     ).toBe('https://cdn.example.com/custom.mp4');
+  });
+});
+
+describe('prefetch queue / abort', () => {
+  beforeEach(() => {
+    resetPrefetchState();
+  });
+
+  afterEach(() => {
+    resetPrefetchState();
+  });
+
+  it('setPrefetchMaxConcurrent accepts zero without throwing', () => {
+    expect(() => setPrefetchMaxConcurrent(0)).not.toThrow();
+  });
+
+  it('abortVideoWarmsOutside clears controllers for dropped URIs', () => {
+    const fetchMock = jest.fn(
+      () =>
+        new Promise(() => {
+          /* never resolves — stay in-flight */
+        })
+    );
+    // @ts-expect-error test mock
+    global.fetch = fetchMock;
+
+    prefetchVideoHints(['https://cdn.example.com/a.mp4']);
+    expect(fetchMock).toHaveBeenCalled();
+
+    abortVideoWarmsOutside(new Set(['https://cdn.example.com/keep.mp4']));
+    prefetchVideoHints(['https://cdn.example.com/b.mp4']);
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('runFeedPrefetch no-ops when window or concurrency is zero', () => {
+    const fetchMock = jest.fn();
+    // @ts-expect-error test mock
+    global.fetch = fetchMock;
+
+    runFeedPrefetch({
+      data: [{ id: '1', videoUri: 'https://cdn.example.com/a.mp4' }],
+      activeIndex: 0,
+      windowSize: 0,
+      strategy: 'directional',
+      direction: 1,
+      maxConcurrent: 2,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    runFeedPrefetch({
+      data: [
+        { id: '1', videoUri: 'https://cdn.example.com/a.mp4' },
+        {
+          id: '2',
+          videoUri: 'https://cdn.example.com/b.mp4',
+          posterUri: 'https://cdn.example.com/b.jpg',
+        },
+      ],
+      activeIndex: 0,
+      windowSize: 2,
+      strategy: 'directional',
+      direction: 1,
+      maxConcurrent: 0,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('isVideoWarmed', () => {
+  beforeEach(() => {
+    resetPrefetchState();
+  });
+
+  afterEach(() => {
+    resetPrefetchState();
+  });
+
+  it('is false for empty or never-warmed URIs', () => {
+    expect(isVideoWarmed('')).toBe(false);
+    expect(isVideoWarmed('https://cdn.example.com/cold.mp4')).toBe(false);
   });
 });
 

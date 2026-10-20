@@ -15,6 +15,8 @@ import {
   useWindowDimensions,
   View,
   type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 
@@ -30,16 +32,43 @@ import {
   FlashReelsContext,
   type FlashReelsContextValue,
 } from '../context/FlashReelsContext';
-import type { FlashReelsProps, FlashReelsRef, ReelData } from '../types';
-import { runFeedPrefetch, type ScrollDirection } from '../utils/prefetch';
-import { isWithinPreloadWindow } from '../utils/preloadWindow';
+import type {
+  FlashReelsProps,
+  FlashReelsRef,
+  ReelData,
+  ScrollDirection,
+} from '../types';
+import {
+  getNetworkAwareDefaults,
+  type NetworkAwareState,
+} from '../utils/networkAware';
+import {
+  subscribeNetworkAware,
+  warnMissingNetInfoOnce,
+} from '../utils/netInfoBridge';
+import {
+  DEFAULT_PREFETCH_MAX_CONCURRENT,
+  runFeedPrefetch,
+} from '../utils/prefetch';
+import { shouldLoadReelAround } from '../utils/preloadWindow';
 import { resolveBufferConfig } from '../utils/resolveBufferConfig';
+import { predictScrollTarget } from '../utils/scrollPrediction';
 import { ReelItem } from './ReelItem';
 
 const VIEWABILITY_CONFIG = {
   // Slightly lower than 60 so a light page flick still settles the active index.
   itemVisiblePercentThreshold: 50,
   waitForInteraction: false,
+};
+
+/** Snap correction threshold — ignore sub-pixel / rubber-band noise. */
+const SNAP_EPSILON_PX = 2;
+/** Treat |velocityY| below this as a settled drag (no fling). */
+const SETTLE_VELOCITY_EPSILON = 0.05;
+
+const DEFAULT_NETWORK_STATE: NetworkAwareState = {
+  kind: 'unknown',
+  isConnected: true,
 };
 
 function FlashReelsInner<T extends ReelData>(
@@ -59,10 +88,14 @@ function FlashReelsInner<T extends ReelData>(
     renderVideo,
     likeIcon,
     preloadWindowSize = 1,
+    preloadStrategy = 'symmetric',
+    drawDistancePages: drawDistancePagesProp,
     prefetchEnabled = false,
     prefetchWindowSize = 2,
     prefetchStrategy = 'directional',
-    showPosterUntilReady = false,
+    prefetchMaxConcurrent = DEFAULT_PREFETCH_MAX_CONCURRENT,
+    networkAware = false,
+    showPosterUntilReady = true,
     posterBlurRadius = 0,
     initialQuality = 'auto',
     resolveVideoUri,
@@ -88,18 +121,77 @@ function FlashReelsInner<T extends ReelData>(
   const listRef = useRef<FlashListRef<T>>(null);
 
   const [activeIndex, setActiveIndex] = useState(0);
+  const [predictedIndex, setPredictedIndex] = useState(0);
   const [uncontrolledMuted, setUncontrolledMuted] = useState(defaultMuted);
   const [isPausedGlobally, setIsPausedGlobally] = useState(false);
+  const [networkState, setNetworkState] = useState<NetworkAwareState>(
+    DEFAULT_NETWORK_STATE
+  );
   const scrollDirectionRef = useRef<ScrollDirection>(1);
+  const [scrollDirection, setScrollDirection] = useState<ScrollDirection>(1);
+  const isScrollingRef = useRef(false);
+  const activeIndexRef = useRef(0);
 
   const isControlled = mutedProp !== undefined;
   const isMuted = isControlled ? mutedProp : uncontrolledMuted;
   const refreshEnabled = onRefresh != null;
 
-  const effectiveBufferConfig = useMemo(
-    () => resolveBufferConfig(bufferConfig, videoCacheEnabled),
-    [bufferConfig, videoCacheEnabled]
-  );
+  const drawDistancePages = drawDistancePagesProp ?? preloadWindowSize + 1;
+
+  const networkDefaults = useMemo(() => {
+    if (!networkAware) {
+      return null;
+    }
+    return getNetworkAwareDefaults({
+      state: networkState,
+      initialQuality,
+      prefetchWindowSize,
+      prefetchMaxConcurrent,
+      hasPreferredPeakBitRate: bufferConfig?.preferredPeakBitRate != null,
+    });
+  }, [
+    networkAware,
+    networkState,
+    initialQuality,
+    prefetchWindowSize,
+    prefetchMaxConcurrent,
+    bufferConfig?.preferredPeakBitRate,
+  ]);
+
+  const effectiveInitialQuality =
+    networkDefaults?.initialQuality ?? initialQuality;
+  const effectivePrefetchEnabled =
+    prefetchEnabled && (networkDefaults?.prefetchEnabled ?? true);
+  const effectivePrefetchWindowSize =
+    networkDefaults?.prefetchWindowSize ?? prefetchWindowSize;
+  const effectivePrefetchMaxConcurrent =
+    networkDefaults?.prefetchMaxConcurrent ?? prefetchMaxConcurrent;
+
+  const effectiveBufferConfig = useMemo(() => {
+    const resolved = resolveBufferConfig(bufferConfig, videoCacheEnabled);
+    if (networkDefaults?.preferredPeakBitRate == null) {
+      return resolved;
+    }
+    if (resolved?.preferredPeakBitRate != null) {
+      return resolved;
+    }
+    return {
+      ...resolved,
+      preferredPeakBitRate: networkDefaults.preferredPeakBitRate,
+    };
+  }, [bufferConfig, videoCacheEnabled, networkDefaults?.preferredPeakBitRate]);
+
+  useEffect(() => {
+    if (!networkAware) {
+      return;
+    }
+    const unsubscribe = subscribeNetworkAware(setNetworkState);
+    if (unsubscribe == null) {
+      warnMissingNetInfoOnce();
+      return;
+    }
+    return unsubscribe;
+  }, [networkAware]);
 
   const setMuted = useCallback(
     (next: boolean) => {
@@ -134,6 +226,16 @@ function FlashReelsInner<T extends ReelData>(
     []
   );
 
+  const applyDirection = useCallback((next: ScrollDirection) => {
+    if (next === 0) {
+      return;
+    }
+    if (scrollDirectionRef.current !== next) {
+      scrollDirectionRef.current = next;
+      setScrollDirection(next);
+    }
+  }, []);
+
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: ViewableItemsChangedInfo) => {
       const first = viewableItems[0];
@@ -146,38 +248,117 @@ function FlashReelsInner<T extends ReelData>(
           return prev;
         }
         if (nextIndex > prev) {
-          scrollDirectionRef.current = 1;
+          applyDirection(1);
         } else if (nextIndex < prev) {
-          scrollDirectionRef.current = -1;
+          applyDirection(-1);
         }
         onIndexChange?.(nextIndex);
+        activeIndexRef.current = nextIndex;
         return nextIndex;
       });
+      if (!isScrollingRef.current) {
+        setPredictedIndex(nextIndex);
+      }
     },
-    [onIndexChange]
+    [onIndexChange, applyDirection]
   );
 
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      isScrollingRef.current = true;
+      const { contentOffset, velocity } = event.nativeEvent;
+      const prediction = predictScrollTarget({
+        offsetY: contentOffset.y,
+        listHeight,
+        dataLength: data.length,
+        velocityY: velocity?.y,
+      });
+      applyDirection(prediction.direction);
+      setPredictedIndex((prev) =>
+        prev === prediction.predictedIndex ? prev : prediction.predictedIndex
+      );
+    },
+    [listHeight, data.length, applyDirection]
+  );
+
+  const settleToNearestPage = useCallback(
+    (offsetY: number) => {
+      if (listHeight <= 0 || data.length === 0) {
+        return;
+      }
+      const maxIndex = data.length - 1;
+      const nearest = Math.max(
+        0,
+        Math.min(maxIndex, Math.round(offsetY / listHeight))
+      );
+      const target = nearest * listHeight;
+      if (Math.abs(offsetY - target) > SNAP_EPSILON_PX) {
+        listRef.current?.scrollToOffset({ offset: target, animated: true });
+      }
+    },
+    [listHeight, data.length]
+  );
+
+  // Finger-up only: never cancel an in-flight fling. Settling here made
+  // paging feel stuck and required a full-page drag with no momentum.
+  const onScrollEndDrag = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const velocityY = event.nativeEvent.velocity?.y ?? 0;
+      if (Math.abs(velocityY) > SETTLE_VELOCITY_EPSILON) {
+        // Momentum will follow — wait for onMomentumScrollEnd.
+        return;
+      }
+      isScrollingRef.current = false;
+      settleToNearestPage(event.nativeEvent.contentOffset.y);
+      setPredictedIndex(activeIndexRef.current);
+    },
+    [settleToNearestPage]
+  );
+
+  const onMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      isScrollingRef.current = false;
+      settleToNearestPage(event.nativeEvent.contentOffset.y);
+      setPredictedIndex(activeIndexRef.current);
+    },
+    [settleToNearestPage]
+  );
+
+  // Prefer predicted index while scrolling for HTTP prefetch and decoder mounts.
+  // Playback ownership stays on settled activeIndex; neighbors only warm muted.
+  const prefetchIndex =
+    predictedIndex !== activeIndex ? predictedIndex : activeIndex;
+  const decoderCenters = useMemo(() => {
+    if (predictedIndex === activeIndex) {
+      return [activeIndex];
+    }
+    return [activeIndex, predictedIndex];
+  }, [activeIndex, predictedIndex]);
+
   useEffect(() => {
-    if (!prefetchEnabled) {
+    if (!effectivePrefetchEnabled) {
       return;
     }
     runFeedPrefetch({
       data,
-      activeIndex,
-      windowSize: prefetchWindowSize,
+      activeIndex: prefetchIndex,
+      windowSize: effectivePrefetchWindowSize,
       strategy: prefetchStrategy,
       direction: scrollDirectionRef.current,
-      initialQuality,
+      initialQuality: effectiveInitialQuality,
       resolveVideoUri,
+      maxConcurrent: effectivePrefetchMaxConcurrent,
     });
   }, [
-    prefetchEnabled,
+    effectivePrefetchEnabled,
     data,
-    activeIndex,
-    prefetchWindowSize,
+    prefetchIndex,
+    effectivePrefetchWindowSize,
     prefetchStrategy,
-    initialQuality,
+    scrollDirection,
+    effectiveInitialQuality,
     resolveVideoUri,
+    effectivePrefetchMaxConcurrent,
   ]);
 
   const contextValue = useMemo<FlashReelsContextValue>(
@@ -207,8 +388,8 @@ function FlashReelsInner<T extends ReelData>(
     [refreshEnabled, refreshing, onRefresh]
   );
 
-  // renderItem reads activeIndex / isMuted / isPausedGlobally from closure so
-  // each ReelItem receives only the props it needs — no context subscription.
+  // Decoder mounts follow settled + predicted centers so fling landings warm
+  // before viewability settles. Only activeIndex plays unmuted.
   const renderItem = useCallback(
     ({ item, index }: { item: T; index: number }) => (
       <ReelItem
@@ -218,10 +399,12 @@ function FlashReelsInner<T extends ReelData>(
         loop={loop}
         preloadWindowSize={preloadWindowSize}
         isActive={index === activeIndex}
-        shouldLoad={isWithinPreloadWindow(
+        shouldLoad={shouldLoadReelAround(
           index,
-          activeIndex,
-          preloadWindowSize
+          decoderCenters,
+          preloadWindowSize,
+          preloadStrategy,
+          scrollDirection
         )}
         isMuted={isMuted}
         isPausedGlobally={isPausedGlobally}
@@ -233,7 +416,7 @@ function FlashReelsInner<T extends ReelData>(
         renderBufferingLoader={renderBufferingLoader}
         showPosterUntilReady={showPosterUntilReady}
         posterBlurRadius={posterBlurRadius}
-        initialQuality={initialQuality}
+        initialQuality={effectiveInitialQuality}
         resolveVideoUri={resolveVideoUri}
         videoStyle={videoStyle}
         renderOverlay={renderOverlay}
@@ -246,7 +429,10 @@ function FlashReelsInner<T extends ReelData>(
       listHeight,
       loop,
       preloadWindowSize,
+      preloadStrategy,
       activeIndex,
+      decoderCenters,
+      scrollDirection,
       isMuted,
       isPausedGlobally,
       likeIcon,
@@ -257,7 +443,7 @@ function FlashReelsInner<T extends ReelData>(
       renderBufferingLoader,
       showPosterUntilReady,
       posterBlurRadius,
-      initialQuality,
+      effectiveInitialQuality,
       resolveVideoUri,
       videoStyle,
       renderOverlay,
@@ -267,15 +453,19 @@ function FlashReelsInner<T extends ReelData>(
     ]
   );
 
-  // Only values that should trigger a full re-render pass on the list.
-  // activeIndex is already handled via renderItem deps; listHeight rarely changes.
   const extraData = useMemo(
-    () => ({ activeIndex, isMuted, isPausedGlobally }),
-    [activeIndex, isMuted, isPausedGlobally]
+    () => ({
+      activeIndex,
+      isMuted,
+      isPausedGlobally,
+      scrollDirection,
+      preloadStrategy,
+    }),
+    [activeIndex, isMuted, isPausedGlobally, scrollDirection, preloadStrategy]
   );
 
-  // Android pagingEnabled on FlashList has historically been jumpy; snap by
-  // interval matches the measured page height more reliably.
+  // pagingEnabled fights snapToInterval on Android and overshoots/sticks;
+  // iOS paging pairs well with full-page reels.
   const pagingEnabled = Platform.OS === 'ios';
 
   return (
@@ -284,31 +474,37 @@ function FlashReelsInner<T extends ReelData>(
         style={[styles.container, containerStyle]}
         onLayout={onContainerLayout}
       >
-        <FlashList
-          ref={listRef}
-          data={data}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          pagingEnabled={pagingEnabled}
-          snapToInterval={listHeight}
-          snapToAlignment="start"
-          disableIntervalMomentum
-          decelerationRate={Platform.OS === 'ios' ? 'fast' : 0.98}
-          showsVerticalScrollIndicator={false}
-          bounces={refreshEnabled}
-          overScrollMode={refreshEnabled ? 'auto' : 'never'}
-          refreshControl={refreshControl}
-          onEndReached={onEndReached}
-          onEndReachedThreshold={onEndReachedThreshold}
-          ListFooterComponent={ListFooterComponent}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={VIEWABILITY_CONFIG}
-          extraData={extraData}
-          drawDistance={listHeight * (preloadWindowSize + 1)}
-          // FlashList v2 recycles via absolute positioning; native
-          // removeClippedSubviews detaches Android video surfaces → black frames.
-          removeClippedSubviews={false}
-        />
+        {listHeight > 0 ? (
+          <FlashList
+            ref={listRef}
+            data={data}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            pagingEnabled={pagingEnabled}
+            snapToInterval={listHeight}
+            snapToAlignment="start"
+            disableIntervalMomentum
+            decelerationRate="fast"
+            showsVerticalScrollIndicator={false}
+            bounces={refreshEnabled}
+            overScrollMode={refreshEnabled ? 'auto' : 'never'}
+            refreshControl={refreshControl}
+            onEndReached={onEndReached}
+            onEndReachedThreshold={onEndReachedThreshold}
+            ListFooterComponent={ListFooterComponent}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={VIEWABILITY_CONFIG}
+            onScroll={onScroll}
+            onScrollEndDrag={onScrollEndDrag}
+            onMomentumScrollEnd={onMomentumScrollEnd}
+            scrollEventThrottle={16}
+            extraData={extraData}
+            drawDistance={listHeight * drawDistancePages}
+            // FlashList v2 recycles via absolute positioning; native
+            // removeClippedSubviews detaches Android video surfaces → black frames.
+            removeClippedSubviews={false}
+          />
+        ) : null}
       </View>
     </FlashReelsContext.Provider>
   );

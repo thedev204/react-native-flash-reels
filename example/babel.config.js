@@ -4,10 +4,14 @@ const pkg = require('../package.json');
 
 const root = path.resolve(__dirname, '..');
 
-module.exports = getConfig(
-  {
-    presets: ['module:@react-native/babel-preset'],
-    plugins: ['react-native-worklets/plugin'],
-  },
-  { root, pkg }
-);
+module.exports = function (api) {
+  api.cache(true);
+
+  return getConfig(
+    {
+      presets: ['babel-preset-expo'],
+      plugins: ['react-native-worklets/plugin'],
+    },
+    { root, pkg }
+  );
+};

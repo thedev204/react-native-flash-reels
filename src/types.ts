@@ -13,6 +13,12 @@ export interface ReelQuality {
 
 export type PrefetchStrategy = 'symmetric' | 'directional';
 
+/** Decoder preload layout — same values as prefetch; default stays symmetric. */
+export type PreloadStrategy = 'symmetric' | 'directional';
+
+/** Scroll bias: +1 forward (down), -1 backward (up), 0 unknown/idle. */
+export type ScrollDirection = 1 | -1 | 0;
+
 export type InitialQuality = 'auto' | 'low' | 'high';
 
 export interface ReelData {
@@ -108,6 +114,17 @@ export interface FlashReelsProps<T extends ReelData = ReelData> {
    * Caps concurrent decoders — especially important on Android. Default 1.
    */
   preloadWindowSize?: number;
+  /**
+   * Decoder window layout. `symmetric` mirrors `±window` (default).
+   * `directional` keeps more slots ahead of scroll than behind.
+   */
+  preloadStrategy?: PreloadStrategy;
+  /**
+   * How many page heights FlashList keeps mounted around the viewport.
+   * Independent of `preloadWindowSize` so you can recycle cells farther
+   * without mounting extra video decoders. Defaults to `preloadWindowSize + 1`.
+   */
+  drawDistancePages?: number;
 
   /**
    * Warm posters and a tiny HTTP Range of upcoming video URIs without mounting
@@ -124,10 +141,21 @@ export interface FlashReelsProps<T extends ReelData = ReelData> {
    * mirrors `±window`. Defaults to `directional`.
    */
   prefetchStrategy?: PrefetchStrategy;
+  /**
+   * Max concurrent video Range warm-ups when prefetch is on. Defaults to 2.
+   * Posters are always scheduled first and are not concurrency-capped.
+   */
+  prefetchMaxConcurrent?: number;
+  /**
+   * When true, tune start quality / prefetch budget from NetInfo (optional peer).
+   * No-op with a one-time warning if NetInfo is not installed. Defaults to false.
+   */
+  networkAware?: boolean;
 
   /**
-   * Keep a poster (optionally blurred) under the built-in player until the
-   * first frame. Ignored when `renderVideo` is provided. Defaults to false.
+   * Keep a poster (optionally blurred) over the built-in player until the
+   * first frame (or a short Android onLoad fallback). Ignored when
+   * `renderVideo` is provided. Defaults to true.
    */
   showPosterUntilReady?: boolean;
   /**
